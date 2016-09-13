@@ -11,11 +11,11 @@
 				    			"name": "IU",
 				    			"description": "IU node"
 				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
-				    			"description": "IU port"
-				    }],
+					"ports": [{
+											"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
+											"name": "IU:port1",
+											"description": "IU port"
+					}],
 				    "links": [{
 				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
 				    	"name": "LinkIUCHIC",
@@ -34,7 +34,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "UM:port1",
 				    			"description": "UM port"
 				    }],
 				    "links": [{
@@ -55,7 +55,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "WSU:port1",
 				    			"description": "WSU port"
 				    }],
 				    "links": [{
@@ -76,7 +76,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "MSU:port1",
 				    			"description": "MSU port"
 				    }],
 				    "links": [{
@@ -97,7 +97,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "CHIC:port1",
 				    			"description": "CHIC port"
 				    }],
 				    "links": [{
@@ -118,7 +118,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "SALT:port1",
 				    			"description": "SALT port"
 				    }]
 				},{
@@ -132,7 +132,7 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "Cloudlab:port1",
 				    			"description": "Cloudlab port"
 				    }],
 				    "links": [{
@@ -161,8 +161,16 @@
 				    }],
 				    "ports": [{
 				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "port1",
+				    			"name": "SC16:port1",
 				    			"description": "SC16 port"
+				    },{
+				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
+				    			"name": "IU-Crest:port1",
+				    			"description": "IU-Crest port"
+				    },{
+				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
+				    			"name": "UMich:port1",
+				    			"description": "UMich port"
 				    }],
 				    "links": [{
 				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
