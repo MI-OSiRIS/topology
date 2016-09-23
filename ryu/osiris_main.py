@@ -13,7 +13,12 @@ from ryu.topology.switches import LLDPPacket
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
-from ryu.lib.packet.lldp import *
+from ryu.lib.packet import lldp
+# from ryu.lib.packet.lldp import *
+from pprint import pprint
+import codecs
+import struct
+# from lldp_host_parser import LLDPHost
 
 PATH = os.path.dirname(__file__)
 
@@ -94,7 +99,107 @@ class OSIRISApp(app_manager.RyuApp):
         in_port = msg.match['in_port']
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
-            self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
-            print LLDPPacket.lldp_parse(msg.data)
-            
+            self.logger.info("SupLLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
+            LLDPHost(LLDPPacket.lldp_parse_new(msg.data))
+            # pprint()
+
+
+class LLDPHost:
+
+    def __init__(self, lldp_tlvs):
+        self.chassis_id = None
+        self.port_id = None
+        self.system_name = None
+        self.system_description = None
+        self.port_description = None
+        self.management_addresses = []
+        for tlv in lldp_tlvs.tlvs:
+            if tlv.tlv_type == lldp.LLDP_TLV_CHASSIS_ID:
+                pprint("------LLDP_TLV_CHASSIS_ID-----")
+                self.parse_chassis_id(tlv)
+            elif tlv.tlv_type == lldp.LLDP_TLV_PORT_ID:
+                self.parse_port_id(tlv)
+                pprint("------LLDP_TLV_PORT_ID-----")
+            elif tlv.tlv_type == lldp.LLDP_TLV_TTL:
+                pprint("------LLDP_TLV_TTL-----")
+            elif tlv.tlv_type == lldp.LLDP_TLV_PORT_DESCRIPTION:
+                pprint("------LLDP_TLV_PORT_DESCRIPTION-----")
+                self.port_description = tlv.tlv_info
+            elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_NAME:
+                pprint("------LLDP_TLV_SYSTEM_NAME-----")
+                self.system_name = tlv.tlv_info
+            elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_DESCRIPTION:
+                pprint("------LLDP_TLV_SYSTEM_DESCRIPTION-----")
+                self.system_description = tlv.tlv_info
+            elif tlv.tlv_type == lldp.LLDP_TLV_MANAGEMENT_ADDRESS:
+                pprint("------LLDP_TLV_MANAGEMENT_ADDRESS-----")
+                self.parse_management_address(tlv)
+        self.display()
+
+# TLV type parsers
+    def parse_chassis_id(self, tlv_chassis_id):
+        if tlv_chassis_id.subtype == lldp.ChassisID.SUB_LOCALLY_ASSIGNED:
+            chassis_id = tlv_chassis_id.chassis_id.decode('utf-8')
+            # pprint(chassis_id)
+            self.chassis_id = chassis_id
+        elif tlv_chassis_id.subtype == lldp.ChassisID.SUB_MAC_ADDRESS:
+            # pprint(self.parse_mac_address(tlv.chassis_id))
+            self.chassis_id = self.parse_mac_address(tlv_chassis_id.chassis_id)
+            # elif tlv.subtype == lldp.ChassisID.
+
+    def parse_port_id(self, tlv_port_id):
+        if tlv_port_id.subtype == lldp.PortID.SUB_PORT_COMPONENT:
+            port_id = tlv_port_id.port_id
+            if len(port_id) == LLDPPacket.PORT_ID_SIZE:
+                (src_port_no, ) = struct.unpack(LLDPPacket.PORT_ID_STR, port_id)
+                self.port_id = src_port_no
+        elif tlv_port_id.subtype == lldp.PortID.SUB_MAC_ADDRESS:
+            self.port_id = self.parse_mac_address(tlv_port_id.port_id)
+
+    def parse_management_address(self, tlv_management_address):
+        if tlv_management_address.addr_subtype == 1:
+            pprint("------IPv4 address----")
+            self.management_addresses.append(self.parse_ipv4_address(tlv_management_address.addr))
+        elif tlv_management_address.addr_subtype == 2:
+            pprint("---- IPv6 address----")
+            self.management_addresses.append(self.parse_ipv4_address(tlv_management_address.addr))
+# Utilities
+    def parse_mac_address(self, hex_string):
+        mac_string = codecs.encode(hex_string, 'hex')
+        new_string = ""
+        for i in range(0, len(mac_string)):
+            if i != 0 and i % 2 == 0:
+                new_string += ':'
+            new_string += mac_string[i]
+        return new_string
+
+    def parse_ipv4_address(self, ip_binary_string):
+        ip_hex_string = codecs.encode(ip_binary_string, 'hex')
+        pprint(ip_hex_string)
+        ip_dec_string = ""
+        for i in range(0, 4):
+            ip_dec_string += str(int(ip_hex_string[2*i:2*i+2], 16))
+            if i != 3:
+                ip_dec_string += "."
+        return ip_dec_string
+
+    def parse_ipv6_address(self, ip_binary_string):
+        ip_hex_string = codecs.encode(ip_binary_string, 'hex')
+        pprint(ip_hex_string)
+        ipv6_string = ""
+        for i in range(0, 8):
+            ipv6_string += ip_hex_string[4 * i:4 * i + 4]
+            if i != 7:
+                ipv6_string += ":"
+        return ipv6_string
+
+
+    def display(self):
+        pprint("==== Printing the LLDP Host details ====")
+        pprint(self.chassis_id)
+        pprint(self.port_id)
+        pprint(self.system_name)
+        pprint(self.system_description)
+        pprint(self.management_addresses)
+
 app_manager.require_app('ryu.app.ofctl_rest')
