@@ -5,43 +5,35 @@
     "domains": [{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "IU Domain",
-	"name": "IU",
-	"id": "sc16_domain_iu"
+	"name": "IU"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "UM Domain",
-	"name": "UM",
-	"id": "sc16_domain_um"
+	"name": "UM"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "WSU Domain",
-	"name": "WSU",
-	"id": "sc16_domain_wsu"
+	"name": "WSU"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "MSU Domain",
-	"name": "MSU",
-	"id": "sc16_domain_msu"
+	"name": "MSU"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "CHIC PoP Domain",
-	"name": "CHIC",
-	"id": "sc16_domain_chic_pop"
+	"name": "CHIC"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "SALT PoP Domain",
-	"name": "SALT",
-	"id": "sc16_domain_salt_pop"
+	"name": "SALT"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "Cloudlab Domain",
-	"name": "Cloudlab",
-	"id": "sc16_domain_cloudlab_utah"
+	"name": "Cloudlab"
     },{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
 	"description": "SC16 SCinet Domain",
-	"name": "SCinet",
-	"id": "sc16_domain_scinet"
+	"name": "SCinet"
     }],
     "links": [{
 	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
