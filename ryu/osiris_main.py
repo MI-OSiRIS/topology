@@ -87,44 +87,61 @@ class OSIRISApp(app_manager.RyuApp):
     @set_ev_cls(event.EventSwitchEnter)
     def switch_enter_handler(self, ev):
         print("**** switch_enter_handler *****")
-        # address = ev.switch.dp.address
-        # pprint(ev.switch.dp.__dict__)
-        # for port in ev.switch.ports:
-        #     pprint(port.to_dict())
-        # # pprint(ev.switch.ports)
-        # dpid = ev.switch.dp.id
-        # print(dpid)s
         self.check_add_switch(ev.switch, ev.switch.dp)
-
 
     def check_add_switch(self, switch, datapath):
         switch_name = "switch:"+str(datapath.id)
+        port_object = None
+        ports_list = []
+
+        # Nodes
         print("*** PRINT 111***")
         switch_node = self.check_node(switch_name)
         print("*** PRINT 112***")
         if switch_node is None:
-            print("*** PRINT 113***")
-            ports_list = []
-            port_object = None
+            print("*** NEW SWITCH***")
             switch_node = Node({"name": switch_name})
             self.rt.insert(switch_node, commit=True)
-            print("*** PRINT 114***")
-            for port in switch.ports:
-                print("*** PRINT 115***")
+
+        # Ports
+        print("*** PRINT 114***")
+        for port in switch.ports:
+            print("*** PRINT 115***")
+            port_object = self.check_port(port.name, switch_node)
+            if port_object is None:
+                print("****NEW PORT***")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
-                print("*** PRINT 116***")
-                self.rt.insert(port_object, commit=True)
-                print("*** PRINT 117***")
-                ports_list.append(port_object)
-                # switch_node.ports.append(port_object)
-                print("*** PRINT 118***")
-            print("*** PRINT 1182***")
-            print("*** PRINT 1183***")
-            switch_node.ports = ports_list
-            # self.rt.insert(switch_node, commit=True)
-            print("*** PRINT 1184***")
-        print("*** PRINT 119***")
+            else:
+                print("****OLD PORT***")
+                port_object = self.merge_port_diff(port_object, port)
+            pprint(port_object.__dict__)
+            print("*** PRINT 116***")
+            self.rt.insert(port_object, commit=True)
+            print("*** PRINT 117***")
+            ports_list.append(port_object)
+            print("*** PRINT 118***")
+        print("*** PRINT 1183***")
+        switch_node.ports = ports_list
+        # self.rt.insert(switch_node, commit=True)
+        print("*** PRINT 1184***")
+
+    def merge_port_diff(self, port_object, port):
+        if port_object.name != port.name.decode("utf-8"):
+            print("*** ERROR: Port name is different***")
+            return None
+        if port_object.index != str(port.port_no):
+            port_object.index = str(port.port_no)
+        if port_object.address.address != port.hw_addr:
+            port_object.address.address = port.hw_addr
+        return port_object
+
+    def check_port(self, port_name, switch_node):
+        for port in switch_node.ports:
+            if port.name == port_name:
+                return port
+        return None
+
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
@@ -227,8 +244,11 @@ class OSIRISApp(app_manager.RyuApp):
         return None
 
     def check_node(self, node_name):
+        pprint("Checking NODES")
         for node in self.rt.nodes:
+            print(node.name)
             if node.name == node_name:
+                print("found")
                 return node
         return None
 
