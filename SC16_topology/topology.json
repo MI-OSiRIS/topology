@@ -1,196 +1,125 @@
 [{
-    "$schema": "http://unis.crest.iu.edu/schema/20160630/topology#",
-    "name": "OSiRIS SC16 Topology",
-    "description": "OSiRIS SC16 Topology description",
-    "domains" : [{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "IU Domain",
-				    "name": "IU",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "IU",
-				    			"description": "IU node"
-				    }],
-					"ports": [{
-											"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-											"name": "IU:port1",
-											"description": "IU port"
-					}],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkIUCHIC",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "IU:port1", "rel": "full"},
-				    				{"href" : "CHIC:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "UM Domain",
-				    "name": "UM",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "UM",
-				    			"description": "UM node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "UM:port1",
-				    			"description": "UM port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkUMCHIC",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "UM:port1", "rel": "full"},
-				    				{"href" : "CHIC:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "WSU Domain",
-				    "name": "WSU",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "WSU",
-				    			"description": "WSU node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "WSU:port1",
-				    			"description": "WSU port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkWSUCHIC",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "WSU:port1", "rel": "full"},
-				    				{"href" : "CHIC:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "MSU Domain",
-				    "name": "MSU",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "MSU",
-				    			"description": "MSU node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "MSU:port1",
-				    			"description": "MSU port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkMSUCHIC",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "MSU:port1", "rel": "full"},
-				    				{"href" : "CHIC:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "CHIC PoP Domain",
-				    "name": "CHIC",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "CHIC",
-				    			"description": "CHIC node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "CHIC:port1",
-				    			"description": "CHIC port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkCHICSALT",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "CHIC:port1", "rel": "full"},
-				    				{"href" : "SALT:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "SALT PoP Domain",
-				    "name": "SALT",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "SALT",
-				    			"description": "SALT node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "SALT:port1",
-				    			"description": "SALT port"
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "Cloudlab Domain",
-				    "name": "Cloudlab",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "Cloudlab",
-				    			"description": "Cloudlab node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "Cloudlab:port1",
-				    			"description": "Cloudlab port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkCloudlabSALT",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "Cloudlab:port1", "rel": "full"},
-				    				{"href" : "SALT:port1", "rel": "full"}]
-				    }]
-				},{
-				    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-				    "description": "SC16 Domain",
-				    "name": "SC16",
-				    "nodes": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "SC16",
-				    			"description": "SC16 node"
-				    },{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "IU-Crest",
-				    			"description": "IU-Crest booth node"
-				    },{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/node#",
-				    			"name": "UMich",
-				    			"description": "UMich Booth node"
-				    }],
-				    "ports": [{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "SC16:port1",
-				    			"description": "SC16 port"
-				    },{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "IU-Crest:port1",
-				    			"description": "IU-Crest port"
-				    },{
-				    			"$schema": "http://unis.crest.iu.edu/schema/20160630/port#",
-				    			"name": "UMich:port1",
-				    			"description": "UMich port"
-				    }],
-				    "links": [{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkSC16SALT",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "SC16:port1", "rel": "full"},
-				    				{"href" : "SALT:port1", "rel": "full"}]
-				    },{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkSC16UMich",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "SC16:port1", "rel": "full"},
-				    				{"href" : "UMich:port1", "rel": "full"}]
-				    },{
-				    	"$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-				    	"name": "LinkSC16SALT",
-				    	"directed": false,
-				    	"endpoints": [{"href" : "SC16:port1", "rel": "full"},
-				    				{"href" : "IU-Crest:port1", "rel": "full"}]
-				    }]
-				}
+  "$schema": "http://unis.crest.iu.edu/schema/20160630/topology#",
+  "name": "OSiRIS SC16 Topology",
+  "description": "OSiRIS SC16 Topology description",
+  "domains": [{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "IU Domain",
+    "name": "IU"
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "UM Domain",
+    "name": "UM",
+    "nodes": [
+      {
+	"href": "http://um-ps01.osris.org:8888/nodes/57277f090f7c51577ba16231",
+	"rel": "full"
+      },
+      {
+	"href": "http://um-ps01.osris.org:8888/nodes/57eac7a50f7c513de4359672",
+	"rel": "full"
+      }
     ]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "WSU Domain",
+    "name": "WSU",
+    "nodes": [
+      {
+	"href": "http://wsu-ps01.osris.org:8888/nodes/572283214e179b57c27ccfc4",
+	"rel": "full"
+      },
+      {
+	"href": "http://wsu-ps01.osris.org:8888/nodes/57eadb814e179b0d60db1d84",
+	"rel": "full"
+      }
+    ]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "MSU Domain",
+    "name": "MSU",
+    "nodes": [
+      {
+	"href": "http://msu-ps01.osris.org:8888/nodes/578f686156c3cccca06342c7",
+	"rel": "full"
+      },
+      {
+	"href": "http://msu-ps01.osris.org:8888/nodes/57ead41e56c3ccdb2c79d36e",
+	"rel": "full"
+      }
+    ]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "CHIC PoP Domain",
+    "name": "CHIC"
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "SALT PoP Domain",
+    "name": "SALT"
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "Cloudlab Domain",
+    "name": "Cloudlab"
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+    "description": "SC16 SCinet Domain",
+    "name": "SCinet"
+  }],
+  "links": [{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-UM-CHIC",
+	"directed": false,
+    "endpoints": [{"href" : "#/domains/1",
+		   "rel": "full"},
+		  {"href" : "#/domains/4",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-MSU-CHIC",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"MSU\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-WSU-CHIC",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"WSU\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-IU-CHIC",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"IU\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-SALT-CHIC",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"SALT\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-Cloudlab-Salt",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"Cloudlab\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"SALT\")]",
+		   "rel": "full"}]
+  },{
+    "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+    "name": "link-SCinet-SALT",
+    "directed": false,
+    "endpoints": [{"href" : "$.domains[?(@.name==\"SCinet\")]",
+		   "rel": "full"},
+		  {"href" : "$.domains[?(@.name==\"SALT\")]",
+		   "rel": "full"}]
+  }]
 }]
