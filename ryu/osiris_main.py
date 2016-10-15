@@ -21,6 +21,9 @@ import struct
 from unis.models import *
 from unis.runtime import Runtime
 
+from ryu import cfg
+CONF = cfg.CONF
+
 # from lldp_host_parser import LLDPHost
 
 PATH = os.path.dirname(__file__)
@@ -34,8 +37,30 @@ class OSIRISApp(app_manager.RyuApp):
         super(OSIRISApp, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
-        self.rt = Runtime("http://localhost:8888")
-        
+        pprint("+++++ ARGS +++++")
+        pprint(args)
+        pprint("+++++ kwargs +++++")
+        pprint(kwargs)
+        unis_server = CONF['osiris_main']['unis_server']
+        self.domain_name = CONF['osiris_main']['domain']
+        pprint("Connecting to UNIS Server at "+unis_server)
+        pprint("Connectiing to Domain: "+self.domain_name)
+        self.rt = Runtime("http://"+unis_server)
+        self.create_domain()
+
+
+    def create_domain(self):
+        domain_obj = None
+        for domain in self.rt.domains:
+            if domain.name == self.domain_name:
+                domain_obj = domain
+                break
+
+        if domain_obj is None:
+            domain_obj = Domain({"name": self.domain_name})
+            self.rt.insert(domain_obj, commit=True)
+        self.domain_obj = domain_obj
+
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
     def _state_change_handler(self, ev):
@@ -95,18 +120,18 @@ class OSIRISApp(app_manager.RyuApp):
         ports_list = []
 
         # Nodes
-        print("*** PRINT 111***")
+        # print("*** PRINT 111***")
         switch_node = self.check_node(switch_name)
-        print("*** PRINT 112***")
+        # print("*** PRINT 112***")
         if switch_node is None:
             print("*** NEW SWITCH***")
             switch_node = Node({"name": switch_name})
             self.rt.insert(switch_node, commit=True)
-
+            self.domain_obj.nodes.append(switch_node)
         # Ports
-        print("*** PRINT 114***")
+        # print("*** PRINT 114***")
         for port in switch.ports:
-            print("*** PRINT 115***")
+            # print("*** PRINT 115***")
             port_object = self.check_port(port.name, switch_node)
             if port_object is None:
                 print("****NEW PORT***")
@@ -115,16 +140,16 @@ class OSIRISApp(app_manager.RyuApp):
             else:
                 print("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
-            pprint(port_object.__dict__)
-            print("*** PRINT 116***")
+            # pprint(port_object.__dict__)
+            # print("*** PRINT 116***")
             self.rt.insert(port_object, commit=True)
-            print("*** PRINT 117***")
+            # print("*** PRINT 117***")
             ports_list.append(port_object)
-            print("*** PRINT 118***")
-        print("*** PRINT 1183***")
+            # print("*** PRINT 118***")
+        # print("*** PRINT 1183***")
         switch_node.ports = ports_list
         # self.rt.insert(switch_node, commit=True)
-        print("*** PRINT 1184***")
+        # print("*** PRINT 1184***")
 
     def merge_port_diff(self, port_object, port):
         if port_object.name != port.name.decode("utf-8"):
@@ -145,8 +170,8 @@ class OSIRISApp(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
-        print("PACKETSSS")
-        print(ev.__dict__)
+        # print("PACKETSSS")
+        # print(ev.__dict__)
         # print(msg.switch)
         datapath = msg.datapath
         ofproto = datapath.ofproto
@@ -170,72 +195,119 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("SupLLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
             lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data))
             print("***PACKET****")
-            self.check_and_add_node(lldp_host_obj)
+            self.check_add_node_and_port(lldp_host_obj)
             self.create_links(datapath, in_port, lldp_host_obj)
-            # print(self.rt.nodes)
-            # pprint()
 
-    def check_and_add_node(self, lldp_host_obj):
-        pprint("check_and_add_node***")
-        pprint(lldp_host_obj.__dict__)
-        print("portID:"+lldp_host_obj.port_id)
-        node = self.check_node(lldp_host_obj.system_name)
-        port_name = lldp_host_obj.port_description
-        port_address = lldp_host_obj.port_id
-        port_address_type = "mac"
-        if node is None:
-            print("*** PRINT 1***")
-            port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
-            print("*** PRINT 12***")
-            self.rt.insert(port, commit=True)
-            print("*** PRINT 13***")
-            pprint(port.__dict__)
-            print("*** PRINT 14***")
-            node = Node({"name": lldp_host_obj.system_name,
-                         "description": lldp_host_obj.system_description})
-            print("*** PRINT 15***")
-            node.ports.append(port)
-            print("*** PRINT 16***")
-            self.rt.insert(node, commit=True)
-            print("*** PRINT 3333***")
+
+    def get_dpid_from_chassis_id(self, chassis_id):
+        "Will be in the format dpid:0000080027c11115, to be converted to decimal of 0000080027c11115"
+        dec_value = int(chassis_id[5:], 16)
+        print("get_dpid_from_chassis_id", dec_value)
+        return dec_value
+
+    def check_add_node_and_port(self, lldp_host_obj):
+        pprint("**check_add_node_and_port***")
+        node = None
+        node_name = ""
+        port_name = None
+
+        # Node Details
+        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
+            print("////// FOUND SWITCH AS NODE /////")
+            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
+            node_name = "switch:" + str(dpid)
         else:
-            print("*** PRINT 2***")
-            port = self.check_port_in_node(node, port_name)
-            if port is None:
-                port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
-                node.ports.append(port)
-        print("*** PRINT 4***")
+            print("////// FOUND HOST AS NODE /////")
+            node_name = lldp_host_obj.system_name
+        node = self.check_node(node_name)
+
+        # Port details
+        # Currently this assumes 1:1 between Nodes and Ports
+        if lldp_host_obj.port_description is not None:
+            port_name = lldp_host_obj.port_description
+
+        port_address = lldp_host_obj.port_id
+        if lldp_host_obj.port_id_subtype == LLDPHost.PORT_ID_MAC_ADDRESS:
+            port_address_type = "mac"
+        else:
+            port_address_type = "number"
+
+        # Create Node and Port object
+        if node is None:
+            port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            self.rt.insert(port, commit=True)
+            node = Node({"name": node_name,
+                         "description": lldp_host_obj.system_description})
+            node.ports.append(port)
+            self.rt.insert(node, commit=True)
+            self.domain_obj.nodes.append(node)
+        else:                                                       # Create Port object
+            if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
+                port = self.check_port_in_node(node, port_name)
+                if port is None:
+                    port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+                    node.ports.append(port)
 
     def create_links(self, datapath, in_port, lldp_host_obj):
         dpid = datapath.id
         switch_port = None
         host_port = None
-        # Find switch Node/ Port Ref
 
-        print("in_port::::::", in_port)
-        print("lldp_host_obj.port_description:::::::::", lldp_host_obj.port_description)
+        # FIND SWITCH NODE
         for node in self.rt.nodes:
             if node.name == "switch:"+str(dpid):
                 for port in node.ports:
                     if port.index == str(in_port):
                         switch_port = port
                         break
-            if node.name == lldp_host_obj.system_name:
-                for port in node.ports:
-                    if port.name == lldp_host_obj.port_description:
-                        host_port = port
-                        break
 
-        pprint("======Creating a link between ")
+        # FIND THE OTHER NODE/PORT
+        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
+            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
+            node_name = "switch:" + str(dpid)
+            node = self.check_node(node_name)
+            host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
+        else:
+            node = self.check_node(lldp_host_obj.system_name)
+            host_port = self.find_port(node.ports, port_name=lldp_host_obj.port_description)
+
+        pprint("///////////switch_port/////////")
         pprint(switch_port.__dict__)
+
+        pprint("///////////host_port/////////")
         pprint(host_port.__dict__)
+        # CREATE THE LINK
+        pprint("======Creating a link between ")
+        pprint(host_port.name)
+        pprint("AND")
+        pprint("SWITCH:"+str(dpid))
+        pprint("====== END LINK CREATE====")
+
         if switch_port is not None and host_port is not None:
             link_name = switch_port.id + ":" + host_port.id
+            link_name_2 = host_port.id + ":" + switch_port.id
             link = self.check_link(link_name)
+            if link is None:
+                link = self.check_link(link_name_2)
+
             if link is None:
                 link = Link({"name": link_name, "directed": False, "endpoints":
                     [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
                 self.rt.insert(link, commit=True)
+
+    def find_port(self, ports, port_name=None, port_index=None):
+        """
+            Returns the first instance of Port Object which matches any condition
+        :param ports:
+        :param port_name:
+        :param port_index:
+        :return: Port Object
+        """
+        for port in ports:
+            if port_index is not None and port_index == port.index:
+                return port
+            if port_name is not None and port_name == port.name:
+                return port
 
     def check_link(self, link_name):
         for link in self.rt.links:
@@ -260,44 +332,69 @@ class OSIRISApp(app_manager.RyuApp):
 
 class LLDPHost:
 
+    # Host Type
+    HOST_TYPE_LLDPD = 0
+    HOST_TYPE_SWITCH = 1
+
+    # Port ID Subtypes
+    PORT_ID_MAC_ADDRESS = 0
+    PORT_ID_NUMBER = 1
+
+    # Chassis ID Subtypes
+    CHASSIS_ID_MAC_ADDRESS = 0
+    CHASSIS_ID_NAME = 1
+
     def __init__(self, lldp_tlvs):
+        self.host_type = None
         self.chassis_id = None
+        self.chassis_id_subtype = None
         self.port_id = None
+        self.port_id_subtype = None
         self.system_name = None
         self.system_description = None
         self.port_description = None
         self.management_addresses = []
         for tlv in lldp_tlvs.tlvs:
             if tlv.tlv_type == lldp.LLDP_TLV_CHASSIS_ID:
-                pprint("------LLDP_TLV_CHASSIS_ID-----")
+                # pprint("------LLDP_TLV_CHASSIS_ID-----")
                 self.parse_chassis_id(tlv)
             elif tlv.tlv_type == lldp.LLDP_TLV_PORT_ID:
                 self.parse_port_id(tlv)
-                pprint("------LLDP_TLV_PORT_ID-----")
+                # pprint("------LLDP_TLV_PORT_ID-----")
             elif tlv.tlv_type == lldp.LLDP_TLV_TTL:
-                pprint("------LLDP_TLV_TTL-----")
+                pass
+                # pprint("------LLDP_TLV_TTL-----")
             elif tlv.tlv_type == lldp.LLDP_TLV_PORT_DESCRIPTION:
-                pprint("------LLDP_TLV_PORT_DESCRIPTION-----")
+                # pprint("------LLDP_TLV_PORT_DESCRIPTION-----")
                 self.port_description = tlv.tlv_info.decode("utf-8")
             elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_NAME:
-                pprint("------LLDP_TLV_SYSTEM_NAME-----")
+                # pprint("------LLDP_TLV_SYSTEM_NAME-----")
                 self.system_name = tlv.tlv_info.decode("utf-8")
             elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_DESCRIPTION:
-                pprint("------LLDP_TLV_SYSTEM_DESCRIPTION-----")
+                # pprint("------LLDP_TLV_SYSTEM_DESCRIPTION-----")
                 self.system_description = tlv.tlv_info.decode("utf-8")
             elif tlv.tlv_type == lldp.LLDP_TLV_MANAGEMENT_ADDRESS:
-                pprint("------LLDP_TLV_MANAGEMENT_ADDRESS-----")
+                # pprint("------LLDP_TLV_MANAGEMENT_ADDRESS-----")
                 self.parse_management_address(tlv)
+        self.parse_host_type()
         self.display()
 
+    def parse_host_type(self):
+        if self.chassis_id is not None and self.chassis_id_subtype == LLDPHost.CHASSIS_ID_NAME and \
+                        "dpid:" in self.chassis_id:
+            self.host_type = LLDPHost.HOST_TYPE_SWITCH
+        else:
+            self.host_type = LLDPHost.HOST_TYPE_LLDPD
 # TLV type parsers
     def parse_chassis_id(self, tlv_chassis_id):
         if tlv_chassis_id.subtype == lldp.ChassisID.SUB_LOCALLY_ASSIGNED:
             chassis_id = tlv_chassis_id.chassis_id.decode('utf-8')
             # pprint(chassis_id)
+            self.chassis_id_subtype = LLDPHost.CHASSIS_ID_NAME
             self.chassis_id = chassis_id
         elif tlv_chassis_id.subtype == lldp.ChassisID.SUB_MAC_ADDRESS:
             # pprint(self.parse_mac_address(tlv.chassis_id))
+            self.chassis_id_subtype = LLDPHost.CHASSIS_ID_MAC_ADDRESS
             self.chassis_id = self.parse_mac_address(tlv_chassis_id.chassis_id)
             # elif tlv.subtype == lldp.ChassisID.
 
@@ -306,16 +403,18 @@ class LLDPHost:
             port_id = tlv_port_id.port_id
             if len(port_id) == LLDPPacket.PORT_ID_SIZE:
                 (src_port_no, ) = struct.unpack(LLDPPacket.PORT_ID_STR, port_id)
+                self.port_id_subtype = LLDPHost.PORT_ID_NUMBER
                 self.port_id = src_port_no
         elif tlv_port_id.subtype == lldp.PortID.SUB_MAC_ADDRESS:
+            self.port_id_subtype = LLDPHost.PORT_ID_MAC_ADDRESS
             self.port_id = self.parse_mac_address(tlv_port_id.port_id)
 
     def parse_management_address(self, tlv_management_address):
         if tlv_management_address.addr_subtype == 1:
-            pprint("------IPv4 address----")
+            # pprint("------IPv4 address----")
             self.management_addresses.append(self.parse_ipv4_address(tlv_management_address.addr))
         elif tlv_management_address.addr_subtype == 2:
-            pprint("---- IPv6 address----")
+            # pprint("---- IPv6 address----")
             self.management_addresses.append(self.parse_ipv6_address(tlv_management_address.addr))
 # Utilities
     def parse_mac_address(self, hex_string):
