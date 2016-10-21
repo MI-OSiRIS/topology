@@ -120,18 +120,15 @@ class OSIRISApp(app_manager.RyuApp):
         ports_list = []
 
         # Nodes
-        # print("*** PRINT 111***")
         switch_node = self.check_node(switch_name)
-        # print("*** PRINT 112***")
         if switch_node is None:
             print("*** NEW SWITCH***")
             switch_node = Node({"name": switch_name})
             self.rt.insert(switch_node, commit=True)
+            print("*** ADDING TO DOMAIN***")
             self.domain_obj.nodes.append(switch_node)
         # Ports
-        # print("*** PRINT 114***")
         for port in switch.ports:
-            # print("*** PRINT 115***")
             port_object = self.check_port(port.name, switch_node)
             if port_object is None:
                 print("****NEW PORT***")
@@ -141,15 +138,11 @@ class OSIRISApp(app_manager.RyuApp):
                 print("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
             # pprint(port_object.__dict__)
-            # print("*** PRINT 116***")
             self.rt.insert(port_object, commit=True)
-            # print("*** PRINT 117***")
+            # self.domain_obj.ports.append(port_object)
             ports_list.append(port_object)
-            # print("*** PRINT 118***")
-        # print("*** PRINT 1183***")
         switch_node.ports = ports_list
         # self.rt.insert(switch_node, commit=True)
-        # print("*** PRINT 1184***")
 
     def merge_port_diff(self, port_object, port):
         if port_object.name != port.name.decode("utf-8"):
@@ -202,7 +195,7 @@ class OSIRISApp(app_manager.RyuApp):
     def get_dpid_from_chassis_id(self, chassis_id):
         "Will be in the format dpid:0000080027c11115, to be converted to decimal of 0000080027c11115"
         dec_value = int(chassis_id[5:], 16)
-        print("get_dpid_from_chassis_id", dec_value)
+        # print("get_dpid_from_chassis_id", dec_value)
         return dec_value
 
     def check_add_node_and_port(self, lldp_host_obj):
@@ -236,10 +229,12 @@ class OSIRISApp(app_manager.RyuApp):
         if node is None:
             port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
             self.rt.insert(port, commit=True)
+            # self.domain_obj.ports.append(port)
             node = Node({"name": node_name,
                          "description": lldp_host_obj.system_description})
             node.ports.append(port)
             self.rt.insert(node, commit=True)
+            print("*** ADDING TO DOMAIN***")
             self.domain_obj.nodes.append(node)
         else:                                                       # Create Port object
             if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
@@ -271,11 +266,11 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(lldp_host_obj.system_name)
             host_port = self.find_port(node.ports, port_name=lldp_host_obj.port_description)
 
-        pprint("///////////switch_port/////////")
-        pprint(switch_port.__dict__)
+        # pprint("///////////switch_port/////////")
+        # pprint(switch_port.__dict__)
 
-        pprint("///////////host_port/////////")
-        pprint(host_port.__dict__)
+        # pprint("///////////host_port/////////")
+        # pprint(host_port.__dict__)
         # CREATE THE LINK
         pprint("======Creating a link between ")
         pprint(host_port.name)
