@@ -215,7 +215,11 @@ class OSIRISApp(app_manager.RyuApp):
 
         # Create Node and Port object
         if node is None:
-            port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            port = None
+            if port_address is not None:
+                port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            else:
+                port = Port({"name": port_name})
             self.rt.insert(port, commit=True)
             # self.domain_obj.ports.append(port)
             node = Node({"name": node_name,
@@ -435,6 +439,7 @@ class LLDPHost:
         pprint("==== Printing the LLDP Host details ====")
         pprint(self.chassis_id)
         pprint(self.port_id)
+        pprint(self.port_description)
         pprint(self.system_name)
         pprint(self.system_description)
         pprint(self.management_addresses)
