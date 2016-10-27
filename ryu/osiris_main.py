@@ -24,7 +24,6 @@ from unis.runtime import Runtime
 from ryu import cfg
 CONF = cfg.CONF
 
-# from lldp_host_parser import LLDPHost
 
 PATH = os.path.dirname(__file__)
 
@@ -37,17 +36,12 @@ class OSIRISApp(app_manager.RyuApp):
         super(OSIRISApp, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
-        pprint("+++++ ARGS +++++")
-        pprint(args)
-        pprint("+++++ kwargs +++++")
-        pprint(kwargs)
         unis_server = CONF['osiris_main']['unis_server']
         self.domain_name = CONF['osiris_main']['domain']
         pprint("Connecting to UNIS Server at "+unis_server)
-        pprint("Connectiing to Domain: "+self.domain_name)
+        pprint("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime("http://"+unis_server)
         self.create_domain()
-
 
     def create_domain(self):
         domain_obj = None
@@ -137,12 +131,9 @@ class OSIRISApp(app_manager.RyuApp):
             else:
                 print("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
-            # pprint(port_object.__dict__)
             self.rt.insert(port_object, commit=True)
-            # self.domain_obj.ports.append(port_object)
             ports_list.append(port_object)
         switch_node.ports = ports_list
-        # self.rt.insert(switch_node, commit=True)
 
     def merge_port_diff(self, port_object, port):
         if port_object.name != port.name.decode("utf-8"):
@@ -163,9 +154,6 @@ class OSIRISApp(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         msg = ev.msg
-        # print("PACKETSSS")
-        # print(ev.__dict__)
-        # print(msg.switch)
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -206,11 +194,11 @@ class OSIRISApp(app_manager.RyuApp):
 
         # Node Details
         if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            print("////// FOUND SWITCH AS NODE /////")
+            # print("////// FOUND SWITCH AS NODE /////")
             dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
             node_name = "switch:" + str(dpid)
         else:
-            print("////// FOUND HOST AS NODE /////")
+            # print("////// FOUND HOST AS NODE /////")
             node_name = lldp_host_obj.system_name
         node = self.check_node(node_name)
 
@@ -289,6 +277,7 @@ class OSIRISApp(app_manager.RyuApp):
                 link = Link({"name": link_name, "directed": False, "endpoints":
                     [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
                 self.rt.insert(link, commit=True)
+                self.domain_obj.links.append(link)
 
     def find_port(self, ports, port_name=None, port_index=None):
         """
@@ -311,11 +300,11 @@ class OSIRISApp(app_manager.RyuApp):
         return None
 
     def check_node(self, node_name):
-        pprint("Checking NODES")
+        # pprint("Checking NODES")
         for node in self.rt.nodes:
-            print(node.name)
+            # print(node.name)
             if node.name == node_name:
-                print("found")
+                # print("found")
                 return node
         return None
 
