@@ -232,7 +232,12 @@ class OSIRISApp(app_manager.RyuApp):
             if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
                 port = self.check_port_in_node(node, port_name)
                 if port is None:
-                    port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+                    if port_address is not None:
+                        port = Port(
+                            {"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+                    else:
+                        port = Port({"name": port_name})
+                    self.rt.insert(port, commit=True)
                     node.ports.append(port)
 
     def create_links(self, datapath, in_port, lldp_host_obj):
@@ -243,6 +248,8 @@ class OSIRISApp(app_manager.RyuApp):
         # FIND SWITCH NODE
         for node in self.rt.nodes:
             if node.name == "switch:"+str(dpid):
+                pprint("SWITCH NODE NAME:"+node.name)
+                pprint("SWITCH NODE ID:" + node.id)
                 for port in node.ports:
                     if port.index == str(in_port):
                         switch_port = port
@@ -264,10 +271,12 @@ class OSIRISApp(app_manager.RyuApp):
         # pprint("///////////host_port/////////")
         # pprint(host_port.__dict__)
         # CREATE THE LINK
+
         pprint("======Creating a link between ")
         pprint(host_port.name)
         pprint("AND")
         pprint("SWITCH:"+str(dpid))
+        pprint(switch_port.name)
         pprint("====== END LINK CREATE====")
 
         if switch_port is not None and host_port is not None:
@@ -298,18 +307,18 @@ class OSIRISApp(app_manager.RyuApp):
                 return port
 
     def check_link(self, link_name):
-        for link in self.rt.links:
-            if link.name == link_name:
-                return link
+        for link in self.rt.links.where({"name": link_name}):
+            # if link.name == link_name:
+            return link
         return None
 
     def check_node(self, node_name):
         # pprint("Checking NODES")
-        for node in self.rt.nodes:
+        for node in self.rt.nodes.where({"name": node_name}):
             # print(node.name)
-            if node.name == node_name:
+            # if node.name == node_name:
                 # print("found")
-                return node
+            return node
         return None
 
     def check_port_in_node(self, node, port_name):
