@@ -51,6 +51,7 @@ class OSIRISApp(app_manager.RyuApp):
                 break
 
         if domain_obj is None:
+            print("CREATING A NEW DOMAIN")
             domain_obj = Domain({"name": self.domain_name})
             self.rt.insert(domain_obj, commit=True)
         self.domain_obj = domain_obj
@@ -86,7 +87,30 @@ class OSIRISApp(app_manager.RyuApp):
         actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
+        self.send_desc_stats_request(datapath)
 
+    def send_desc_stats_request(self, datapath):
+        pprint("*****Send send_desc_stats_request*****")
+        ofp_parser = datapath.ofproto_parser
+        req = ofp_parser.OFPDescStatsRequest(datapath, 0)
+        datapath.send_msg(req)
+
+    @set_ev_cls(ofp_event.EventOFPDescStatsReply, MAIN_DISPATCHER)
+    def desc_stats_reply_handler(self, ev):
+        pprint("****desc_stats_reply_handler   ******")
+        body = ev.msg.body
+        switch_node = self.check_node("switch:"+str(ev.msg.datapath.id))
+        if switch_node is not None:
+            description_str = ""
+            if body.mfr_desc is not None:
+                description_str += body.mfr_desc.decode("utf-8") + ","
+            if body.hw_desc is not None:
+                description_str += body.hw_desc.decode("utf-8") + ","
+            if body.sw_desc is not None:
+                description_str += body.sw_desc.decode("utf-8") + ","
+            if len(description_str) > 0:
+                description_str = description_str[:-1]
+            switch_node.description = description_str
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -109,6 +133,16 @@ class OSIRISApp(app_manager.RyuApp):
         self.check_add_switch(ev.switch, ev.switch.dp)
 
     def check_add_switch(self, switch, datapath):
+        """
+            This function adds the switch as a Node into the specified domain into UNIS.
+            The node name will be switch:<dp_id>
+            Also adds ports of a switch as Port objects with port No as Index and MAC address.
+            If a port already exists for a switch in UNIS, it updates the MAC address and Port No, if there are any changes.
+
+        :param switch:
+        :param datapath:
+        :return:
+        """
         switch_name = "switch:"+str(datapath.id)
         port_object = None
         ports_list = []
@@ -123,6 +157,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.domain_obj.nodes.append(switch_node)
         # Ports
         for port in switch.ports:
+            # Search by Port Name
             port_object = self.check_port(port.name, switch_node)
             if port_object is None:
                 print("****NEW PORT***")
@@ -173,7 +208,7 @@ class OSIRISApp(app_manager.RyuApp):
         in_port = msg.match['in_port']
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
-            self.logger.info("SupLLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
+            self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
             lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data))
             print("***PACKET****")
             self.check_add_node_and_port(lldp_host_obj)
