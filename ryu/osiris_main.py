@@ -1,3 +1,17 @@
+"""
+    This is a RYU application which builds Dynamic Network Topology information from all the Openflow switches connected to this RYU controller.
+    The Topology information is automatically pushed to UNIS server using UNISRt.
+    The Topology information Nodes, Ports and Links will be part of the Domain name specified.
+To RUN:
+ryu-manager ./osiris_main.py --default-log-level=1 --install-lldp-flow --observe-links --ofp-tcp-listen-port=<Openflow-port>
+--osiris_main-domain <UNIS_DOMAIN_NAME> --osiris_main-unis_server <UNIS_HOST_IP>:<UNIS_HOST_PORT>
+
+Requirements:
+* Python3
+* UNISRt package installed
+
+"""
+
 import os
 import six
 
@@ -97,6 +111,11 @@ class OSIRISApp(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPDescStatsReply, MAIN_DISPATCHER)
     def desc_stats_reply_handler(self, ev):
+        """
+            Retrieves Details switch info from OF Desc Stats Reply message and pushes into UNIS switch node
+        :param ev:
+        :return:
+        """
         pprint("****desc_stats_reply_handler   ******")
         body = ev.msg.body
         switch_node = self.check_node("switch:"+str(ev.msg.datapath.id))
@@ -222,6 +241,15 @@ class OSIRISApp(app_manager.RyuApp):
         return dec_value
 
     def check_add_node_and_port(self, lldp_host_obj):
+        """
+            Creates UNIS Nodes and Ports from the LLDPHost information provided.
+            Switch Nodes will be created by node_name as switch:<dp-id> and Host Nodes' name will be LLDP System Name.
+            As LLDP Advertisement can contain only one Port Information, this function assumes 1:1 relation
+            between Host and Ports.
+
+        :param lldp_host_obj:
+        :return:
+        """
         pprint("**check_add_node_and_port***")
         node = None
         node_name = ""
@@ -276,6 +304,15 @@ class OSIRISApp(app_manager.RyuApp):
                     node.ports.append(port)
 
     def create_links(self, datapath, in_port, lldp_host_obj):
+        """ A link is always established between a switch node and host node.
+            port1 will be switch node's port to which it is getting connected
+            port2 will be host node's port
+            Link name will be <port1-id>:<port2-id>
+            :param datapath: switch datapath details to find the switch node
+            :param in_port: switch in_port details to find the switch port
+            :param lldp_host_obj: LLDPHost Object to find the host node/port
+        """
+
         dpid = datapath.id
         switch_port = None
         host_port = None
