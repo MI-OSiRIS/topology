@@ -1,0 +1,69 @@
+[{
+  "$schema": "http://unis.crest.iu.edu/schema/20160630/topology#",
+  "name": "OSiRIS Topology",
+  "description": "OSiRIS Topology description",
+  "domains": [
+    {
+      "href": "http://dev.crest.iu.edu:8888/domains/581a7ea5e779893337a68d13",
+      "rel": "full"
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+      "description": "UM Domain",
+      "name": "UM"
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+      "description": "WSU Domain",
+      "name": "WSU"
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+      "description": "MSU Domain",
+      "name": "MSU"
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
+      "description": "CHIC PoP Domain",
+      "name": "CHIC PoP"
+    }
+  ],
+  "links": [
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-UM-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "http://dev.crest.iu.edu:8888/domains/581a7ea5e779893337a68d13",
+		     "rel": "full"},
+		    {"href" : "#/domains/4",
+		     "rel": "full"}]
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-MSU-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "$.domains[?(@.name==\"MSU\")]",
+		     "rel": "full"},
+		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		     "rel": "full"}]
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-WSU-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "$.domains[?(@.name==\"WSU\")]",
+		     "rel": "full"},
+		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		     "rel": "full"}]
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-IU-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "$.domains[?(@.name==\"IU\")]",
+		     "rel": "full"},
+		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		     "rel": "full"}]
+    }
+  ]
+}]
