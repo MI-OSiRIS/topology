@@ -31,7 +31,7 @@
   "links": [
     {
       "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-      "name": "link-UM-CHIC",
+      "name": "link-IU-CHIC",
       "directed": false,
       "endpoints": [{"href" : "http://dev.crest.iu.edu:8888/domains/581a7ea5e779893337a68d13",
 		     "rel": "full"},
@@ -44,7 +44,7 @@
       "directed": false,
       "endpoints": [{"href" : "$.domains[?(@.name==\"MSU\")]",
 		     "rel": "full"},
-		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
 		     "rel": "full"}]
     },
     {
@@ -53,16 +53,16 @@
       "directed": false,
       "endpoints": [{"href" : "$.domains[?(@.name==\"WSU\")]",
 		     "rel": "full"},
-		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
 		     "rel": "full"}]
     },
     {
       "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-      "name": "link-IU-CHIC",
+      "name": "link-UM-CHIC",
       "directed": false,
-      "endpoints": [{"href" : "$.domains[?(@.name==\"IU\")]",
+      "endpoints": [{"href" : "$.domains[?(@.name==\"UM\")]",
 		     "rel": "full"},
-		    {"href" : "$.domains[?(@.name==\"CHIC\")]",
+		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
 		     "rel": "full"}]
     }
   ]
