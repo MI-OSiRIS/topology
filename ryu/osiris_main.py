@@ -28,16 +28,20 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
+from ryu.ofproto import *
 # from ryu.lib.packet.lldp import *
 from pprint import pprint
 import codecs
 import struct
 from unis.models import *
 from unis.runtime import Runtime
-
+import traceback
+import sys
 from ryu import cfg
 CONF = cfg.CONF
 
+#Create OFSwitchNode class
+OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
 
 PATH = os.path.dirname(__file__)
 
@@ -45,15 +49,15 @@ class OSIRISApp(app_manager.RyuApp):
     _CONTEXTS = {
         'switches': switches.Switches
     }
-    
+
     def __init__(self, *args, **kwargs):
         super(OSIRISApp, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
         unis_server = CONF['osiris_main']['unis_server']
         self.domain_name = CONF['osiris_main']['domain']
-        pprint("Connecting to UNIS Server at "+unis_server)
-        pprint("Connecting to Domain: "+self.domain_name)
+        self.logger.info("Connecting to UNIS Server at "+unis_server)
+        self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime("http://"+unis_server)
         self.create_domain()
 
@@ -82,14 +86,23 @@ class OSIRISApp(app_manager.RyuApp):
             if datapath.id in self.datapaths:
                 self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
-                
+
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
-        print("**** switch_features_handler *****")
+        self.logger.info("**** switch_features_handler *****")
+        # self.logger.info(ev.msg.version)
+        self.logger.info("*****END INFO*******")
         datapath = ev.msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
+        # ofproto = datapath.ofproto
+        # parser = datapath.ofproto_parser
+        #
+        # self.logger.info("ofproto.OFP_VERSION:: %s" % ofproto.OFP_VERSION)
+        # if ofproto.OFP_VERSION == 0x01:
+        #     self.logger.info("Version 1.0")
+        # elif ofproto.OFP_VERSION == 0x04:
+        #     self.logger.info("Version 1.3")
+        # else:
+        #     self.logger.info("Some version OF")
         # install table-miss flow entry
         #
         # We specify NO BUFFER to max_len of the output action due to
@@ -97,14 +110,19 @@ class OSIRISApp(app_manager.RyuApp):
         # 128, OVS will send Packet-In with invalid buffer_id and
         # truncated packet data. In that case, we cannot output packets
         # correctly.  The bug has been fixed in OVS v2.1.0.
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
-                                          ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
+        # match = parser.OFPMatch()
+        # OFPCML_NO_BUFFER attr not in OF 1.0
+        # if hasattr(ofproto, 'OFPCML_NO_BUFFER'):
+        #     actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
+        #                                   ofproto.OFPCML_NO_BUFFER)]
+        # else:
+        #     actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
+        self.add_flow_new(datapath)
+        # self.add_flow(datapath, 0, match, actions)
         self.send_desc_stats_request(datapath)
 
     def send_desc_stats_request(self, datapath):
-        pprint("*****Send send_desc_stats_request*****")
+        self.logger.info("*****Send send_desc_stats_request*****")
         ofp_parser = datapath.ofproto_parser
         req = ofp_parser.OFPDescStatsRequest(datapath, 0)
         datapath.send_msg(req)
@@ -112,24 +130,54 @@ class OSIRISApp(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPDescStatsReply, MAIN_DISPATCHER)
     def desc_stats_reply_handler(self, ev):
         """
-            Retrieves Details switch info from OF Desc Stats Reply message and pushes into UNIS switch node
+            Retrieves detailed switch info from OF Desc Stats Reply message and pushes into UNIS switch node
         :param ev:
         :return:
         """
-        pprint("****desc_stats_reply_handler   ******")
+        self.logger.info("****desc_stats_reply_handler   ******"+str(ev.msg.datapath.id))
         body = ev.msg.body
         switch_node = self.check_node("switch:"+str(ev.msg.datapath.id))
         if switch_node is not None:
             description_str = ""
             if body.mfr_desc is not None:
                 description_str += body.mfr_desc.decode("utf-8") + ","
+                switch_node.mfrdesc = body.mfr_desc.decode("utf-8")
             if body.hw_desc is not None:
                 description_str += body.hw_desc.decode("utf-8") + ","
+                switch_node.hwdesc = body.hw_desc.decode("utf-8")
             if body.sw_desc is not None:
                 description_str += body.sw_desc.decode("utf-8") + ","
+                switch_node.swdesc = body.sw_desc.decode("utf-8")
             if len(description_str) > 0:
                 description_str = description_str[:-1]
-            switch_node.description = description_str
+            if switch_node.description == "":
+                switch_node.description = description_str
+
+    def add_flow_new(self, datapath):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        if ofproto.OFP_VERSION == 0x01:
+            self.logger.info("Version 1.0")
+            match = parser.OFPMatch()
+            actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
+            mod = parser.OFPFlowMod(datapath=datapath, priority=0,
+                                    match=match, actions=actions)
+            datapath.send_msg(mod)
+            self.logger.info("Flow configured for 1.0")
+        elif ofproto.OFP_VERSION == 0x04:
+            self.logger.info("Version 1.3")
+            match = parser.OFPMatch()
+            actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
+                                                  ofproto.OFPCML_NO_BUFFER)]
+            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
+                                                 actions)]
+            mod = parser.OFPFlowMod(datapath=datapath, priority=0,
+                                        match=match, instructions=inst)
+            datapath.send_msg(mod)
+            self.logger.info("Flow configured for 1.3")
+        else:
+            self.logger.info("Some version OF")
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -148,8 +196,9 @@ class OSIRISApp(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     def switch_enter_handler(self, ev):
-        print("**** switch_enter_handler *****")
+        self.logger.info("**** switch_enter_handler *****")
         self.check_add_switch(ev.switch, ev.switch.dp)
+        self.logger.info("**** switch_enter_handler done*****")
 
     def check_add_switch(self, switch, datapath):
         """
@@ -166,24 +215,29 @@ class OSIRISApp(app_manager.RyuApp):
         port_object = None
         ports_list = []
 
+        self.logger.info("**** Adding the switch *****")
         # Nodes
         switch_node = self.check_node(switch_name)
+
         if switch_node is None:
-            print("*** NEW SWITCH***")
-            switch_node = Node({"name": switch_name})
+            self.logger.info("*** NEW SWITCH***")
+            switch_node = OFSwitchNode({"name": switch_name, "datapathid": str(datapath.id)})
             self.rt.insert(switch_node, commit=True)
-            print("*** ADDING TO DOMAIN***")
+            self.logger.info("*** ADDING TO DOMAIN***")
             self.domain_obj.nodes.append(switch_node)
+        else:
+            self.logger.info("FOUND switch_node id: %s" % switch_node.id)
+        self.logger.info("**** Adding the ports *****")
         # Ports
         for port in switch.ports:
             # Search by Port Name
             port_object = self.check_port(port.name, switch_node)
             if port_object is None:
-                print("****NEW PORT***")
+                self.logger.info("****NEW PORT***")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
             else:
-                print("****OLD PORT***")
+                self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
             self.rt.insert(port_object, commit=True)
             ports_list.append(port_object)
@@ -191,7 +245,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     def merge_port_diff(self, port_object, port):
         if port_object.name != port.name.decode("utf-8"):
-            print("*** ERROR: Port name is different***")
+            self.logger.info("*** ERROR: Port name is different***")
             return None
         if port_object.index != str(port.port_no):
             port_object.index = str(port.port_no)
@@ -214,7 +268,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         # get Datapath ID to identify OpenFlow switches.
         dpid = datapath.id
-        print("********dpid********"+str(dpid))
+        self.logger.info("********dpid********"+str(dpid))
         self.mac_to_port.setdefault(dpid, {})
 
         # analyse the received packets using the packet library.
@@ -240,6 +294,37 @@ class OSIRISApp(app_manager.RyuApp):
         # print("get_dpid_from_chassis_id", dec_value)
         return dec_value
 
+    def determine_node_name_from_lldp(self, lldp_host_obj):
+        """
+            Implement Fallbacks for Node Name determination from the LLDP objects
+        :param lldp_host_obj:
+        :return: node_name or None if can be determined
+        """
+        node_name = None
+        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
+            # print("////// FOUND SWITCH AS NODE /////")
+            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
+            node_name = "switch:" + str(dpid)
+        elif lldp_host_obj.system_name is not None:
+            # print("////// FOUND HOST AS NODE /////")
+            node_name = lldp_host_obj.system_name
+        elif lldp_host_obj.chassis_id is not None:
+            node_name = "device:"+str(lldp_host_obj.chassis_id)
+        return node_name
+
+    def determine_port_name_from_lldp(self, lldp_host_obj):
+        """
+            Implement Fallbacks for Port Name determination from the LLDP objects
+        :param lldp_host_obj:
+        :return: port_name or None if can be determined
+        """
+        port_name = None
+        if lldp_host_obj.port_description is not None:
+            port_name = lldp_host_obj.port_description
+        elif lldp_host_obj.port_id is not None:
+            port_name = "port:"+str(lldp_host_obj.port_id)
+        return port_name
+
     def check_add_node_and_port(self, lldp_host_obj):
         """
             Creates UNIS Nodes and Ports from the LLDPHost information provided.
@@ -250,58 +335,73 @@ class OSIRISApp(app_manager.RyuApp):
         :param lldp_host_obj:
         :return:
         """
-        pprint("**check_add_node_and_port***")
-        node = None
-        node_name = ""
-        port_name = None
+        self.logger.info("**check_add_node_and_port***")
+        try:
+            # Node Details
+            node_name = self.determine_node_name_from_lldp(lldp_host_obj)
+            if node_name is None:
+                self.logger.error("LLDP Node cannot be added due to insufficient information.")
+                return
+            node = self.check_node(node_name)
 
-        # Node Details
-        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            # print("////// FOUND SWITCH AS NODE /////")
-            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
-            node_name = "switch:" + str(dpid)
-        else:
-            # print("////// FOUND HOST AS NODE /////")
-            node_name = lldp_host_obj.system_name
-        node = self.check_node(node_name)
-
-        # Port details
-        # Currently this assumes 1:1 between Nodes and Ports
-        if lldp_host_obj.port_description is not None:
-            port_name = lldp_host_obj.port_description
-
-        port_address = lldp_host_obj.port_id
-        if lldp_host_obj.port_id_subtype == LLDPHost.PORT_ID_MAC_ADDRESS:
-            port_address_type = "mac"
-        else:
-            port_address_type = "number"
-
-        # Create Node and Port object
-        if node is None:
-            port = None
-            if port_address is not None:
-                port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            # Port details
+            # Currently this assumes 1:1 between Nodes and Ports
+            port_name = self.determine_port_name_from_lldp(lldp_host_obj)
+            if port_name is None or lldp_host_obj.port_id is None:
+                self.logger.error("LLDP Node's port cannot be added due to insufficient information.")
+                return
+            port_address = lldp_host_obj.port_id
+            if lldp_host_obj.port_id_subtype == LLDPHost.PORT_ID_MAC_ADDRESS:
+                port_address_type = "mac"
             else:
-                port = Port({"name": port_name})
-            self.rt.insert(port, commit=True)
-            # self.domain_obj.ports.append(port)
-            node = Node({"name": node_name,
-                         "description": lldp_host_obj.system_description})
-            node.ports.append(port)
-            self.rt.insert(node, commit=True)
-            print("*** ADDING TO DOMAIN***")
-            self.domain_obj.nodes.append(node)
-        else:                                                       # Create Port object
-            if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
-                port = self.check_port_in_node(node, port_name)
-                if port is None:
-                    if port_address is not None:
-                        port = Port(
-                            {"name": port_name, "address": {"type": port_address_type, "address": port_address}})
-                    else:
-                        port = Port({"name": port_name})
-                    self.rt.insert(port, commit=True)
-                    node.ports.append(port)
+                port_address_type = "number"
+
+            # Create Node
+            if node is None:
+                node = Node({"name": node_name})
+                self.rt.insert(node, commit=True)
+
+            # Create Port
+            port = self.check_port_in_node(node, port_name)
+            if port is None:
+                port = Port(
+                        {"name": port_name, "address": {"type": port_address_type, "address": str(port_address)}})
+                self.rt.insert(port, commit=True)
+                node.ports.append(port)
+
+            # Create Node and Port object
+            # if node is None:
+            #     port = None
+            #     if port_address is not None:
+            #         port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            #     else:
+            #         port = Port({"name": port_name})
+            #     self.rt.insert(port, commit=True)
+            #     # self.domain_obj.ports.append(port)
+            #     node = Node({"name": node_name})
+            #     if lldp_host_obj.system_description is not None:
+            #         node.description = lldp_host_obj.system_description
+            #     node.ports.append(port)
+            #     self.rt.insert(node, commit=True)
+            #     print("*** ADDING TO DOMAIN***")
+            #     self.domain_obj.nodes.append(node)
+            # else:                                                       # Create Port object
+            #     if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
+            #         port = self.check_port_in_node(node, port_name)
+            #         if port is None:
+            #             if port_address is not None:
+            #                 port = Port(
+            #                     {"name": port_name, "address": {"type": port_address_type, "address": port_address}})
+            #             else:
+            #                 port = Port({"name": port_name})
+            #             self.rt.insert(port, commit=True)
+            #             node.ports.append(port)
+        except:
+            self.logger.info("EEEEEEEException in check_add_node_and_port")
+            self.logger.info(lldp_host_obj.__dict__)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            self.logger.error(''.join(line for line in lines))
 
     def create_links(self, datapath, in_port, lldp_host_obj):
         """ A link is always established between a switch node and host node.
@@ -317,52 +417,66 @@ class OSIRISApp(app_manager.RyuApp):
         switch_port = None
         host_port = None
 
-        # FIND SWITCH NODE
-        for node in self.rt.nodes:
-            if node.name == "switch:"+str(dpid):
-                pprint("SWITCH NODE NAME:"+node.name)
-                pprint("SWITCH NODE ID:" + node.id)
-                for port in node.ports:
-                    if port.index == str(in_port):
-                        switch_port = port
-                        break
+        try:
+            # FIND SWITCH NODE
+            for node in self.rt.nodes:
+                if node.name == "switch:"+str(dpid):
+                    self.logger.info("SWITCH NODE NAME:"+node.name)
+                    self.logger.info("SWITCH NODE ID:" + node.id)
+                    for port in node.ports:
+                        if port.index == str(in_port):
+                            switch_port = port
+                            break
 
-        # FIND THE OTHER NODE/PORT
-        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
-            node_name = "switch:" + str(dpid)
+            # FIND THE OTHER NODE/PORT
+            node_name = self.determine_node_name_from_lldp(lldp_host_obj)
             node = self.check_node(node_name)
-            host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
-        else:
-            node = self.check_node(lldp_host_obj.system_name)
-            host_port = self.find_port(node.ports, port_name=lldp_host_obj.port_description)
+            port_name = self.determine_port_name_from_lldp(lldp_host_obj)
+            host_port = self.check_port(port_name, node)
 
-        # pprint("///////////switch_port/////////")
-        # pprint(switch_port.__dict__)
+            # host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
 
-        # pprint("///////////host_port/////////")
-        # pprint(host_port.__dict__)
-        # CREATE THE LINK
+            # if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
+            #     dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
+            #     node_name = "switch:" + str(dpid)
+            #     node = self.check_node(node_name)
+            #     host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
+            # else:
+            #     node = self.check_node(lldp_host_obj.system_name)
+            #     host_port = self.find_port(node.ports, port_name=lldp_host_obj.port_description)
 
-        pprint("======Creating a link between ")
-        pprint(host_port.name)
-        pprint("AND")
-        pprint("SWITCH:"+str(dpid))
-        pprint(switch_port.name)
-        pprint("====== END LINK CREATE====")
+            # pprint("///////////switch_port/////////")
+            # pprint(switch_port.__dict__)
 
-        if switch_port is not None and host_port is not None:
-            link_name = switch_port.id + ":" + host_port.id
-            link_name_2 = host_port.id + ":" + switch_port.id
-            link = self.check_link(link_name)
-            if link is None:
-                link = self.check_link(link_name_2)
+            # pprint("///////////host_port/////////")
+            # pprint(host_port.__dict__)
+            # CREATE THE LINK
 
-            if link is None:
-                link = Link({"name": link_name, "directed": False, "endpoints":
-                    [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
-                self.rt.insert(link, commit=True)
-                self.domain_obj.links.append(link)
+            self.logger.info("======Creating a link between ")
+            self.logger.info(host_port.name)
+            self.logger.info("AND")
+            self.logger.info("SWITCH:"+str(dpid))
+            self.logger.info(switch_port.name)
+            self.logger.info("====== END LINK CREATE====")
+
+            if switch_port is not None and host_port is not None:
+                link_name = switch_port.id + ":" + host_port.id
+                link_name_2 = host_port.id + ":" + switch_port.id
+                link = self.check_link(link_name)
+                if link is None:
+                    link = self.check_link(link_name_2)
+
+                if link is None:
+                    link = Link({"name": link_name, "directed": False, "endpoints":
+                        [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
+                    self.rt.insert(link, commit=True)
+                    self.domain_obj.links.append(link)
+        except:
+            self.logger.info("EEEEEEEException in create_links ---------")
+            self.logger.info(lldp_host_obj.__dict__)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+            self.logger.error(''.join(line for line in lines))
 
     def find_port(self, ports, port_name=None, port_index=None):
         """
