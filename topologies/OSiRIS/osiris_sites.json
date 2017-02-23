@@ -4,7 +4,7 @@
   "description": "OSiRIS Topology description",
   "domains": [
     {
-      "href": "http://dev.crest.iu.edu:8888/domains/581a7ea5e779893337a68d13",
+      "href": "http://dev.crest.iu.edu:8888/domains/58af2137e7798971725bbd78",
       "rel": "full"
     },
     {
@@ -33,7 +33,7 @@
       "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
       "name": "link-IU-CHIC",
       "directed": false,
-      "endpoints": [{"href" : "http://dev.crest.iu.edu:8888/domains/581a7ea5e779893337a68d13",
+      "endpoints": [{"href" : "http://dev.crest.iu.edu:8888/domains/58af2137e7798971725bbd78",
 		     "rel": "full"},
 		    {"href" : "#/domains/4",
 		     "rel": "full"}]
