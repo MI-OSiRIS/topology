@@ -38,6 +38,9 @@ from unis.runtime import Runtime
 import traceback
 import sys
 from ryu import cfg
+import time
+import threading
+
 CONF = cfg.CONF
 
 #Create OFSwitchNode class
@@ -58,8 +61,19 @@ class OSIRISApp(app_manager.RyuApp):
         self.domain_name = CONF['osiris_main']['domain']
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime("http://"+unis_server)
+        self.rt = Runtime("http://"+unis_server, defer_update=True)
         self.create_domain()
+        updates_thread = threading.Thread(target=self.start_updates, args=[10])
+        updates_thread.start()
+        # self.start_updates(10)
+
+    def start_updates(self, time_secs):
+
+        self.logger.info("----- UPDATE TIMER SET TO "+str(time_secs)+"s  -------")
+        while True:
+            time.sleep(time_secs)
+            self.logger.info("----- UPDATING UNIS DB -------")
+            self.rt.flush()
 
     def create_domain(self):
         domain_obj = None
@@ -69,7 +83,7 @@ class OSIRISApp(app_manager.RyuApp):
                 break
 
         if domain_obj is None:
-            print("CREATING A NEW DOMAIN")
+            self.logger("CREATING A NEW DOMAIN")
             domain_obj = Domain({"name": self.domain_name})
             self.rt.insert(domain_obj, commit=True)
         self.domain_obj = domain_obj
@@ -86,6 +100,11 @@ class OSIRISApp(app_manager.RyuApp):
             if datapath.id in self.datapaths:
                 self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
+                self.deregister_switch(datapath)
+
+    def deregister_switch(self, datapath):
+        self.logger.debug('deregister_switch datapath: %s', datapath.id)
+        self.logger.debug(self.check_node('switch:'+str(datapath.id)))
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -119,7 +138,6 @@ class OSIRISApp(app_manager.RyuApp):
         #     actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
         self.add_flow_new(datapath)
         # self.add_flow(datapath, 0, match, actions)
-        self.send_desc_stats_request(datapath)
 
     def send_desc_stats_request(self, datapath):
         self.logger.info("*****Send send_desc_stats_request*****")
@@ -150,7 +168,7 @@ class OSIRISApp(app_manager.RyuApp):
                 switch_node.swdesc = body.sw_desc.decode("utf-8")
             if len(description_str) > 0:
                 description_str = description_str[:-1]
-            if switch_node.description == "":
+            if len(switch_node.description) == 0:
                 switch_node.description = description_str
 
     def add_flow_new(self, datapath):
@@ -177,7 +195,7 @@ class OSIRISApp(app_manager.RyuApp):
             datapath.send_msg(mod)
             self.logger.info("Flow configured for 1.3")
         else:
-            self.logger.info("Some version OF")
+            self.logger.info("Some other version of OF")
 
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
@@ -198,6 +216,7 @@ class OSIRISApp(app_manager.RyuApp):
     def switch_enter_handler(self, ev):
         self.logger.info("**** switch_enter_handler *****")
         self.check_add_switch(ev.switch, ev.switch.dp)
+        self.send_desc_stats_request(ev.switch.dp)
         self.logger.info("**** switch_enter_handler done*****")
 
     def check_add_switch(self, switch, datapath):
@@ -236,6 +255,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.info("****NEW PORT***")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
+                self.domain_obj.ports.append(port_object)
             else:
                 self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
@@ -282,8 +302,9 @@ class OSIRISApp(app_manager.RyuApp):
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
-            lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data))
-            print("***PACKET****")
+            lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data), self.logger)
+            self.logger.info("***PACKET****")
+
             self.check_add_node_and_port(lldp_host_obj)
             self.create_links(datapath, in_port, lldp_host_obj)
 
@@ -359,7 +380,11 @@ class OSIRISApp(app_manager.RyuApp):
             # Create Node
             if node is None:
                 node = Node({"name": node_name})
+                if lldp_host_obj.system_description is not None:
+                    self.logger.debug("Updating node description to %s" % lldp_host_obj.system_description)
+                    node.description = lldp_host_obj.system_description
                 self.rt.insert(node, commit=True)
+                self.domain_obj.nodes.append(node)
 
             # Create Port
             port = self.check_port_in_node(node, port_name)
@@ -368,6 +393,7 @@ class OSIRISApp(app_manager.RyuApp):
                         {"name": port_name, "address": {"type": port_address_type, "address": str(port_address)}})
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
+                self.domain_obj.ports.append(port)
 
             # Create Node and Port object
             # if node is None:
@@ -527,7 +553,8 @@ class LLDPHost:
     CHASSIS_ID_MAC_ADDRESS = 0
     CHASSIS_ID_NAME = 1
 
-    def __init__(self, lldp_tlvs):
+    def __init__(self, lldp_tlvs, logger):
+        self.logger = logger
         self.host_type = None
         self.chassis_id = None
         self.chassis_id_subtype = None
@@ -611,7 +638,7 @@ class LLDPHost:
 
     def parse_ipv4_address(self, ip_binary_string):
         ip_hex_string = codecs.encode(ip_binary_string, 'hex')
-        pprint(ip_hex_string)
+        self.logger.info(ip_hex_string)
         ip_dec_string = ""
         for i in range(0, 4):
             ip_dec_string += str(int(ip_hex_string[2*i:2*i+2], 16))
@@ -621,7 +648,7 @@ class LLDPHost:
 
     def parse_ipv6_address(self, ip_binary_string):
         ip_hex_string = codecs.encode(ip_binary_string, 'hex').decode('utf-8')
-        pprint(ip_hex_string)
+        self.logger.info(ip_hex_string)
         ipv6_string = ""
         for i in range(0, 8):
             ipv6_string += str(ip_hex_string[4 * i:4 * i + 4])
@@ -631,12 +658,12 @@ class LLDPHost:
 
 
     def display(self):
-        pprint("==== Printing the LLDP Host details ====")
-        pprint(self.chassis_id)
-        pprint(self.port_id)
-        pprint(self.port_description)
-        pprint(self.system_name)
-        pprint(self.system_description)
-        pprint(self.management_addresses)
+        self.logger.info("==== Printing the LLDP Host details ====")
+        self.logger.info(self.chassis_id)
+        self.logger.info(self.port_id)
+        self.logger.info(self.port_description)
+        self.logger.info(self.system_name)
+        self.logger.info(self.system_description)
+        self.logger.info(self.management_addresses)
 
 app_manager.require_app('ryu.app.ofctl_rest')
