@@ -1,0 +1,15 @@
+[Unit]
+Description=OSiRIS SDN Service
+After=network.target
+Requires=supervisord.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/share/osiris-sdn/wait_sv_sock
+ExecStart=/usr/bin/supervisorctl start osiris-sdn
+ExecReload=/usr/bin/supervisorctl reload osiris-sdn
+ExecStop=/usr/bin/supervisorctl stop osiris-sdn
+
+[Install]
+WantedBy=multi-user.target
