@@ -23,6 +23,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import set_ev_cls
 from ryu.topology import event, switches
 from ryu.topology.switches import LLDPPacket
+# from ryu.lib.packet import packet, ethernet
 
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
@@ -40,8 +41,13 @@ import sys
 from ryu import cfg
 import time
 import threading
+from threading import Lock
 
 CONF = cfg.CONF
+
+# CONF.register_cli_opts([
+#     cfg.StrOpt('osiris-domain', default='', help='domain')
+# ])
 
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
@@ -57,15 +63,22 @@ class OSIRISApp(app_manager.RyuApp):
         super(OSIRISApp, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
-        unis_server = CONF['osiris_main']['unis_server']
-        self.domain_name = CONF['osiris_main']['domain']
+        self.CONF.register_opts([
+            cfg.StrOpt('osiris_domain', default=''),
+            cfg.StrOpt('unis_server', default='')
+        ])
+        # self.CONF()
+        self.domain_name = self.CONF.osiris_domain
+        unis_server = self.CONF.unis_server
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime("http://"+unis_server, defer_update=True)
+        self.rt = Runtime("http://"+unis_server, defer_update=False)
         self.create_domain()
-        updates_thread = threading.Thread(target=self.start_updates, args=[10])
-        updates_thread.start()
-        # self.start_updates(10)
+        # self.mutex_lock = Lock()
+        # updates_thread = threading.Thread(target=self.start_updates, args=[10])
+        # updates_thread.start()
+        # self.alive_dict = dict()
+        # self.switches_dict = dict()
 
     def start_updates(self, time_secs):
 
@@ -73,7 +86,31 @@ class OSIRISApp(app_manager.RyuApp):
         while True:
             time.sleep(time_secs)
             self.logger.info("----- UPDATING UNIS DB -------")
-            self.rt.flush()
+            # self.rt.flush()
+
+            self.mutex_lock.acquire()
+            # LLDP updates
+            self.send_alive_dict_updates()
+            # Reset
+            self.alive_dict = dict()
+
+            # Switch Updates
+            self.send_switches_updates()
+            self.mutex_lock.release()
+
+    def send_switches_updates(self):
+        self.logger.info("----- send_switches_updates -------")
+        for id_ in self.switches_dict:
+            self.switches_dict[id_].update(force=True)
+        self.logger.info("----- send_switches_updates end -------")
+
+    def send_alive_dict_updates(self):
+        self.logger.info("----- send_alive_dict_updates -------")
+        self.logger.info(self.alive_dict)
+        for id_ in self.alive_dict:
+            self.logger.info("----- id_ : %s -------" % id_)
+            self.alive_dict[id_].update(force=True)
+        self.logger.info("----- send_alive_dict_updates done -------")
 
     def create_domain(self):
         domain_obj = None
@@ -105,6 +142,17 @@ class OSIRISApp(app_manager.RyuApp):
     def deregister_switch(self, datapath):
         self.logger.debug('deregister_switch datapath: %s', datapath.id)
         self.logger.debug(self.check_node('switch:'+str(datapath.id)))
+        switch_object = self.check_node('switch:' + str(datapath.id))
+
+        # Remove the port entries
+        # self.mutex_lock.acquire()
+        # for port_obj in switch_object.ports:
+        #     del self.switches_dict[port_obj.id]
+        #
+        # # Remove the node entry from switches dict
+        # del self.switches_dict[switch_object.id]
+        # self.mutex_lock.release()
+
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -246,6 +294,10 @@ class OSIRISApp(app_manager.RyuApp):
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
+
+        # self.mutex_lock.acquire()
+        # self.switches_dict[switch_node.id] = switch_node
+        # self.mutex_lock.release()
         self.logger.info("**** Adding the ports *****")
         # Ports
         for port in switch.ports:
@@ -260,6 +312,10 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
             self.rt.insert(port_object, commit=True)
+
+            # self.mutex_lock.acquire()
+            # self.switches_dict[port_object.id] = port_object
+            # self.mutex_lock.release()
             ports_list.append(port_object)
         switch_node.ports = ports_list
 
@@ -302,7 +358,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
-            lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data), self.logger)
+            lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
             self.logger.info("***PACKET****")
 
             self.check_add_node_and_port(lldp_host_obj)
@@ -395,6 +451,12 @@ class OSIRISApp(app_manager.RyuApp):
                 node.ports.append(port)
                 self.domain_obj.ports.append(port)
 
+            # add nodes and ports
+            # self.mutex_lock.acquire()
+            # self.alive_dict[node.id] = node
+            # self.alive_dict[port.id] = port
+            # self.mutex_lock.release()
+
             # Create Node and Port object
             # if node is None:
             #     port = None
@@ -445,7 +507,9 @@ class OSIRISApp(app_manager.RyuApp):
 
         try:
             # FIND SWITCH NODE
+            self.logger.info("============NUMBER OF NODES ===== %d" % len(self.rt.nodes))
             for node in self.rt.nodes:
+                self.logger.info("SWITCH NODE ID:" + node.id)
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE NAME:"+node.name)
                     self.logger.info("SWITCH NODE ID:" + node.id)
@@ -497,6 +561,10 @@ class OSIRISApp(app_manager.RyuApp):
                         [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
                     self.rt.insert(link, commit=True)
                     self.domain_obj.links.append(link)
+
+                # self.mutex_lock.acquire()
+                # self.alive_dict[link.id] = link
+                # self.mutex_lock.release()
         except:
             self.logger.info("EEEEEEEException in create_links ---------")
             self.logger.info(lldp_host_obj.__dict__)
@@ -588,6 +656,17 @@ class LLDPHost:
                 self.parse_management_address(tlv)
         self.parse_host_type()
         self.display()
+
+    @staticmethod
+    def lldp_parse_new(data):
+        pkt = packet.Packet(data)
+        i = iter(pkt)
+        eth_pkt = six.next(i)
+        assert type(eth_pkt) == ethernet.ethernet
+        lldp_pkt = six.next(i)
+        if type(lldp_pkt) != lldp.lldp:
+            raise LLDPPacket.LLDPUnknownFormat()
+        return lldp_pkt
 
     def parse_host_type(self):
         if self.chassis_id is not None and self.chassis_id_subtype == LLDPHost.CHASSIS_ID_NAME and \
