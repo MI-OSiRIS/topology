@@ -39,7 +39,6 @@ import traceback
 import sys
 from ryu import cfg
 import time
-import threading
 
 CONF = cfg.CONF
 
@@ -63,22 +62,21 @@ class OSIRISApp(app_manager.RyuApp):
         ])
         self.domain_name = self.CONF.osiris_domain
         unis_server = self.CONF.unis_server
-        self.domain_name = CONF['osiris_main']['domain']
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime("http://"+unis_server, defer_update=True)
+        self.rt = Runtime("http://"+unis_server, defer_update=False)
         self.create_domain()
         # updates_thread = threading.Thread(target=self.start_updates, args=[10])
         # updates_thread.start()
         # self.start_updates(10)
 
-    def start_updates(self, time_secs):
-
-        self.logger.info("----- UPDATE TIMER SET TO "+str(time_secs)+"s  -------")
-        while True:
-            time.sleep(time_secs)
-            self.logger.info("----- UPDATING UNIS DB -------")
-            self.rt.flush()
+    # def start_updates(self, time_secs):
+    #
+    #     self.logger.info("----- UPDATE TIMER SET TO "+str(time_secs)+"s  -------")
+    #     while True:
+    #         time.sleep(time_secs)
+    #         self.logger.info("----- UPDATING UNIS DB -------")
+    #         self.rt.flush()
 
     def create_domain(self):
         domain_obj = None
@@ -484,10 +482,10 @@ class OSIRISApp(app_manager.RyuApp):
             # CREATE THE LINK
 
             self.logger.info("======Creating a link between ")
-            self.logger.info(host_port.name)
-            self.logger.info("AND")
-            self.logger.info("SWITCH:"+str(dpid))
-            self.logger.info(switch_port.name)
+            # self.logger.info(host_port.name)
+            # self.logger.info("AND")
+            # self.logger.info("SWITCH:"+str(dpid))
+            # self.logger.info(switch_port.name)
             self.logger.info("====== END LINK CREATE====")
 
             if switch_port is not None and host_port is not None:
