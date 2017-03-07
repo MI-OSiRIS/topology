@@ -1,0 +1,7 @@
+include MANIFEST.in
+include *.md
+include osiris_main.py
+graft config
+global-exclude *~
+global-exclude *.pyc
+global-exclude .gitignore
