@@ -14,6 +14,12 @@ Requirements:
 
 import os
 import six
+import codecs
+import struct
+import traceback
+import sys
+import time
+from pprint import pprint
 
 from ryu.base import app_manager
 
@@ -29,10 +35,10 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
-# from ryu.lib.packet.lldp import *
-from pprint import pprint
-import codecs
-import struct
+
+from ryu import cfg
+from oslo_config.cfg import OptGroup
+
 from unis.models import *
 from unis.runtime import Runtime
 import traceback
@@ -40,11 +46,9 @@ import sys
 from ryu import cfg
 import time
 
-CONF = cfg.CONF
 
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
-
 PATH = os.path.dirname(__file__)
 
 class OSIRISApp(app_manager.RyuApp):
@@ -57,11 +61,11 @@ class OSIRISApp(app_manager.RyuApp):
         self.mac_to_port = {}
         self.datapaths = {}
         self.CONF.register_opts([
-            cfg.StrOpt('osiris_domain', default=''),
-            cfg.StrOpt('unis_server', default='')
-        ])
-        self.domain_name = self.CONF.osiris_domain
-        unis_server = self.CONF.unis_server
+            cfg.StrOpt('unis_domain', default=''),
+            cfg.StrOpt('unis_server', default='localhost:8888')
+        ], group="osiris")
+        self.domain_name = self.CONF.osiris.unis_domain
+        unis_server = self.CONF.osiris.unis_server
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime("http://"+unis_server, defer_update=False)
