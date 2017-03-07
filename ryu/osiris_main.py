@@ -14,6 +14,12 @@ Requirements:
 
 import os
 import six
+import codecs
+import struct
+import traceback
+import sys
+import time
+from pprint import pprint
 
 from ryu.base import app_manager
 
@@ -29,23 +35,21 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
-# from ryu.lib.packet.lldp import *
-from pprint import pprint
-import codecs
-import struct
+
+from ryu import cfg
+from oslo_config.cfg import OptGroup
+
 from unis.models import *
 from unis.runtime import Runtime
-import traceback
-import sys
-from ryu import cfg
-import time
-import threading
 
-CONF = cfg.CONF
+opt_group = OptGroup(name='osiris', title='OSiRIS SDN Config') 
+osiris_opts = [
+    cfg.StrOpt('unis_domain', default=''),
+    cfg.StrOpt('unis_server', default='http://localhost:8888')
+]
 
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
-
 PATH = os.path.dirname(__file__)
 
 class OSIRISApp(app_manager.RyuApp):
@@ -55,26 +59,27 @@ class OSIRISApp(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(OSIRISApp, self).__init__(*args, **kwargs)
+        self._init_config()
         self.mac_to_port = {}
         self.datapaths = {}
-        self.CONF.register_opts([
-            cfg.StrOpt('osiris_domain', default=''),
-            cfg.StrOpt('unis_server', default='')
-        ])
-        self.domain_name = self.CONF.osiris_domain
-        unis_server = self.CONF.unis_server
-        self.domain_name = CONF['osiris_main']['domain']
-        self.logger.info("Connecting to UNIS Server at "+unis_server)
-        self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime("http://"+unis_server, defer_update=True)
-        self.create_domain()
-        # updates_thread = threading.Thread(target=self.start_updates, args=[10])
-        # updates_thread.start()
-        # self.start_updates(10)
+        try:
+            self.rt = Runtime(self.unis_server, defer_update=True)
+            self.create_domain()
+        except Exception as e:
+            self.logger.error("Could not initialize UNIS-RT: {}".format(e))
+            raise SystemExit
+
+    def _init_config(self):
+        CONF = cfg.CONF
+        CONF.register_group(opt_group)
+        CONF.register_opts(osiris_opts, opt_group)
+        self.unis_domain = CONF.osiris.unis_domain
+        self.unis_server = CONF.osiris.unis_server
+        self.logger.info("Connecting to UNIS Server: {}".format(self.unis_server))
+        self.logger.info("Connecting to Domain: {}".format(self.unis_domain))
 
     def start_updates(self, time_secs):
-
-        self.logger.info("----- UPDATE TIMER SET TO "+str(time_secs)+"s  -------")
+        self.logger.info("----- UPDATE TIMER SET TO {}s -------".format(time_secs))
         while True:
             time.sleep(time_secs)
             self.logger.info("----- UPDATING UNIS DB -------")
@@ -83,13 +88,13 @@ class OSIRISApp(app_manager.RyuApp):
     def create_domain(self):
         domain_obj = None
         for domain in self.rt.domains:
-            if domain.name == self.domain_name:
+            if domain.name == self.unis_domain:
                 domain_obj = domain
                 break
 
         if domain_obj is None:
             self.logger.info("CREATING A NEW DOMAIN")
-            domain_obj = Domain({"name": self.domain_name})
+            domain_obj = Domain({"name": self.unis_domain})
             self.rt.insert(domain_obj, commit=True)
         self.domain_obj = domain_obj
 
