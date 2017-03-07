@@ -57,14 +57,19 @@ class OSIRISApp(app_manager.RyuApp):
         super(OSIRISApp, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
-        unis_server = CONF['osiris_main']['unis_server']
+        self.CONF.register_opts([
+            cfg.StrOpt('osiris_domain', default=''),
+            cfg.StrOpt('unis_server', default='')
+        ])
+        self.domain_name = self.CONF.osiris_domain
+        unis_server = self.CONF.unis_server
         self.domain_name = CONF['osiris_main']['domain']
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime("http://"+unis_server, defer_update=True)
         self.create_domain()
-        updates_thread = threading.Thread(target=self.start_updates, args=[10])
-        updates_thread.start()
+        # updates_thread = threading.Thread(target=self.start_updates, args=[10])
+        # updates_thread.start()
         # self.start_updates(10)
 
     def start_updates(self, time_secs):
@@ -83,7 +88,7 @@ class OSIRISApp(app_manager.RyuApp):
                 break
 
         if domain_obj is None:
-            self.logger("CREATING A NEW DOMAIN")
+            self.logger.info("CREATING A NEW DOMAIN")
             domain_obj = Domain({"name": self.domain_name})
             self.rt.insert(domain_obj, commit=True)
         self.domain_obj = domain_obj
@@ -302,7 +307,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
-            lldp_host_obj = LLDPHost(LLDPPacket.lldp_parse_new(msg.data), self.logger)
+            lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
             self.logger.info("***PACKET****")
 
             self.check_add_node_and_port(lldp_host_obj)
@@ -588,6 +593,17 @@ class LLDPHost:
                 self.parse_management_address(tlv)
         self.parse_host_type()
         self.display()
+
+    @staticmethod
+    def lldp_parse_new(data):
+        pkt = packet.Packet(data)
+        i = iter(pkt)
+        eth_pkt = six.next(i)
+        assert type(eth_pkt) == ethernet.ethernet
+        lldp_pkt = six.next(i)
+        if type(lldp_pkt) != lldp.lldp:
+            raise LLDPPacket.LLDPUnknownFormat()
+        return lldp_pkt
 
     def parse_host_type(self):
         if self.chassis_id is not None and self.chassis_id_subtype == LLDPHost.CHASSIS_ID_NAME and \
