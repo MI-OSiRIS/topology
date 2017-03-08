@@ -61,13 +61,13 @@ class OSIRISApp(app_manager.RyuApp):
         self.datapaths = {}
         self.CONF.register_opts([
             cfg.StrOpt('unis_domain', default=''),
-            cfg.StrOpt('unis_server', default='localhost:8888')
+            cfg.StrOpt('unis_server', default='http://localhost:8888')
         ], group="osiris")
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime("http://"+unis_server, defer_update=False)
+        self.rt = Runtime(unis_server, defer_update=False)
         self.create_domain()
         self.interval_secs = 30
         self.update_time_secs = calendar.timegm(time.gmtime())
@@ -83,7 +83,7 @@ class OSIRISApp(app_manager.RyuApp):
             return
         self.logger.info("----- UPDATING UNIS DB -------")
         self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
-        self.rt.flush()
+        # self.rt.flush()
 
     def create_domain(self):
         try:
@@ -264,11 +264,11 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.info("****NEW PORT***")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
+                self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
             else:
                 self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
-            self.rt.insert(port_object, commit=True)
             ports_list.append(port_object)
         switch_node.ports = ports_list
 
