@@ -44,7 +44,7 @@ from unis.runtime import Runtime
 import traceback
 import sys
 from ryu import cfg
-import time
+import calendar
 
 
 #Create OFSwitchNode class
@@ -70,9 +70,25 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime("http://"+unis_server, defer_update=False)
         self.create_domain()
+        self.interval_secs = 30
+        self.update_time_secs = calendar.timegm(time.gmtime())
         # updates_thread = threading.Thread(target=self.start_updates, args=[10])
         # updates_thread.start()
         # self.start_updates(10)
+
+    def send_updates_decorator(func):
+        def func_wrapper(self, *args, **kwargs):
+            self.send_updates()
+            func(self, *args, **kwargs)
+        return func_wrapper
+
+    def send_updates(self):
+        if not calendar.timegm(time.gmtime()) >= self.update_time_secs:
+            return
+
+        self.logger.info("----- UPDATING UNIS DB -------")
+        self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
+
 
     # def start_updates(self, time_secs):
     #
@@ -97,6 +113,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    @send_updates_decorator
     def _state_change_handler(self, ev):
         datapath = ev.datapath
         if ev.state == MAIN_DISPATCHER:
@@ -114,6 +131,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.debug(self.check_node('switch:'+str(datapath.id)))
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    @send_updates_decorator
     def switch_features_handler(self, ev):
         self.logger.info("**** switch_features_handler *****")
         # self.logger.info(ev.msg.version)
@@ -220,6 +238,7 @@ class OSIRISApp(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     @set_ev_cls(event.EventSwitchEnter)
+    @send_updates_decorator
     def switch_enter_handler(self, ev):
         self.logger.info("**** switch_enter_handler *****")
         self.check_add_switch(ev.switch, ev.switch.dp)
@@ -287,6 +306,7 @@ class OSIRISApp(app_manager.RyuApp):
         return None
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    @send_updates_decorator
     def _packet_in_handler(self, ev):
         msg = ev.msg
         datapath = msg.datapath
