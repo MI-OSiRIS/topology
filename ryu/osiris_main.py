@@ -46,7 +46,6 @@ import sys
 from ryu import cfg
 import calendar
 
-
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
 PATH = os.path.dirname(__file__)
@@ -72,9 +71,6 @@ class OSIRISApp(app_manager.RyuApp):
         self.create_domain()
         self.interval_secs = 30
         self.update_time_secs = calendar.timegm(time.gmtime())
-        # updates_thread = threading.Thread(target=self.start_updates, args=[10])
-        # updates_thread.start()
-        # self.start_updates(10)
 
     def send_updates_decorator(func):
         def func_wrapper(self, *args, **kwargs):
@@ -85,32 +81,19 @@ class OSIRISApp(app_manager.RyuApp):
     def send_updates(self):
         if not calendar.timegm(time.gmtime()) >= self.update_time_secs:
             return
-
         self.logger.info("----- UPDATING UNIS DB -------")
         self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
-
-
-    # def start_updates(self, time_secs):
-    #
-    #     self.logger.info("----- UPDATE TIMER SET TO "+str(time_secs)+"s  -------")
-    #     while True:
-    #         time.sleep(time_secs)
-    #         self.logger.info("----- UPDATING UNIS DB -------")
-    #         self.rt.flush()
+        self.rt.flush()
 
     def create_domain(self):
-        domain_obj = None
-        for domain in self.rt.domains:
-            if domain.name == self.domain_name:
-                domain_obj = domain
-                break
-
-        if domain_obj is None:
+        try:
+            domain_obj = next(self.rt.domains.where(lambda x: x.name == self.domain_name))
+        except StopIteration:
             self.logger.info("CREATING A NEW DOMAIN")
             domain_obj = Domain({"name": self.domain_name})
             self.rt.insert(domain_obj, commit=True)
         self.domain_obj = domain_obj
-
+        
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
     @send_updates_decorator
