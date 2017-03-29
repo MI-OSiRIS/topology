@@ -71,6 +71,8 @@ class OSIRISApp(app_manager.RyuApp):
         self.create_domain()
         self.interval_secs = 30
         self.update_time_secs = calendar.timegm(time.gmtime())
+        self.alive_dict = dict()
+        self.switches_dict = dict()
 
     def send_updates_decorator(func):
         def func_wrapper(self, *args, **kwargs):
@@ -83,7 +85,24 @@ class OSIRISApp(app_manager.RyuApp):
             return
         self.logger.info("----- UPDATING UNIS DB -------")
         self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
-        # self.rt.flush()
+        self.send_alive_dict_updates()
+        self.alive_dict = dict()
+        self.send_switches_updates()
+
+    def send_switches_updates(self):
+        self.logger.info("----- send_switches_updates -------")
+        for id_ in self.switches_dict:
+            self.switches_dict[id_].update(force=True)
+        self.logger.info("----- send_switches_updates end -------")
+
+    def send_alive_dict_updates(self):
+        self.logger.info("----- send_alive_dict_updates -------")
+        self.logger.info(self.alive_dict)
+        for id_ in self.alive_dict:
+            self.logger.info("----- id_ : %s -------" % id_)
+            self.alive_dict[id_].update(force=True)
+        self.logger.info("----- send_alive_dict_updates done -------")
+
 
     def create_domain(self):
         try:
@@ -112,6 +131,15 @@ class OSIRISApp(app_manager.RyuApp):
     def deregister_switch(self, datapath):
         self.logger.debug('deregister_switch datapath: %s', datapath.id)
         self.logger.debug(self.check_node('switch:'+str(datapath.id)))
+        switch_object = self.check_node('switch:' + str(datapath.id))
+
+        # Remove the port entries
+        # for port_obj in switch_object.ports:
+        #     del self.switches_dict[port_obj.id]
+        #
+        # # Remove the node entry from switches dict
+        # del self.switches_dict[switch_object.id]
+
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     @send_updates_decorator
@@ -255,6 +283,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
+        # self.switches_dict[switch_node.id] = switch_node
         self.logger.info("**** Adding the ports *****")
         # Ports
         for port in switch.ports:
@@ -266,6 +295,7 @@ class OSIRISApp(app_manager.RyuApp):
                     {"address": port.hw_addr, "type": "mac"}})
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
+                # self.switches_dict[port_object.id] = port_object
             else:
                 self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
@@ -405,6 +435,9 @@ class OSIRISApp(app_manager.RyuApp):
                 node.ports.append(port)
                 self.domain_obj.ports.append(port)
 
+            # self.alive_dict[node.id] = node
+            # self.alive_dict[port.id] = port
+
             # Create Node and Port object
             # if node is None:
             #     port = None
@@ -507,6 +540,8 @@ class OSIRISApp(app_manager.RyuApp):
                         [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
                     self.rt.insert(link, commit=True)
                     self.domain_obj.links.append(link)
+
+                # self.alive_dict[link.id] = link
         except:
             self.logger.info("EEEEEEEException in create_links ---------")
             self.logger.info(lldp_host_obj.__dict__)
