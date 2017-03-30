@@ -278,6 +278,8 @@ class OSIRISApp(app_manager.RyuApp):
         if switch_node is None:
             self.logger.info("*** NEW SWITCH***")
             switch_node = OFSwitchNode({"name": switch_name, "datapathid": str(datapath.id)})
+            if datapath.address is not None:
+                switch_node.mgmtaddress = datapath.address[0]
             self.rt.insert(switch_node, commit=True)
             self.logger.info("*** ADDING TO DOMAIN***")
             self.domain_obj.nodes.append(switch_node)
