@@ -67,7 +67,7 @@ class OSIRISApp(app_manager.RyuApp):
         unis_server = self.CONF.osiris.unis_server
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime(unis_server, defer_update=False)
+        self.rt = Runtime(unis_server, subscribe=False, defer_update=False)
         self.create_domain()
         self.interval_secs = 30
         self.update_time_secs = calendar.timegm(time.gmtime())
@@ -134,11 +134,49 @@ class OSIRISApp(app_manager.RyuApp):
         switch_object = self.check_node('switch:' + str(datapath.id))
 
         # Remove the port entries
-        # for port_obj in switch_object.ports:
-        #     del self.switches_dict[port_obj.id]
+        for port_obj in switch_object.ports:
+            del self.switches_dict[port_obj.id]
         #
         # # Remove the node entry from switches dict
-        # del self.switches_dict[switch_object.id]
+        del self.switches_dict[switch_object.id]
+
+    @set_ev_cls(ofp_event.EventOFPPortStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _port_state_change_handler(self, ev):
+        datapath_obj = ev.datapath
+        port_number = ev.port_no
+        reason = ev.reason
+        ofproto = datapath_obj.ofproto
+        self.logger.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&_port_state_change_handler")
+        self.logger.info('_port_state_change_handler sv obj: %s', ev.__dict__)
+
+        switch_name = "switch:"+str(datapath_obj.id)
+        switch_node = self.check_node(switch_name)
+        self.logger.info('Found switch id %s', switch_node.id)
+        port = datapath_obj.ports[port_number]
+        port_state = port.state
+
+        port_object = self.find_port(switch_node.ports, port_index=str(port_number))
+        # self.logger.info('Found port id %s', port_object.id)
+
+        if port_state == 1:
+            self.logger.info('PORT DELETE')
+            self.logger.info(port_object)
+            if port_object is not None and port_object.id in self.switches_dict:
+                del self.switches_dict[port_object.id]
+                self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
+        else:
+            self.logger.info('PORT ADD or MODIFY')
+            if port_object is not None:
+                self.logger.info('PORT Already exists')
+                if port_object.id not in self.switches_dict:
+                    self.switches_dict[port_object.id] = port_object
+            else:
+                port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
+                    {"address": port.hw_addr, "type": "mac"}})
+                self.rt.insert(port_object, commit=True)
+                self.domain_obj.ports.append(port_object)
+                self.switches_dict[port_object.id] = port_object
+                self.logger.info('PORT ADDED with %d number and %s id', port_number, port_object.id)
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -285,7 +323,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
-        # self.switches_dict[switch_node.id] = switch_node
+        self.switches_dict[switch_node.id] = switch_node
         self.logger.info("**** Adding the ports *****")
         # Ports
         for port in switch.ports:
@@ -297,7 +335,7 @@ class OSIRISApp(app_manager.RyuApp):
                     {"address": port.hw_addr, "type": "mac"}})
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
-                # self.switches_dict[port_object.id] = port_object
+                self.switches_dict[port_object.id] = port_object
             else:
                 self.logger.info("****OLD PORT***")
                 port_object = self.merge_port_diff(port_object, port)
@@ -437,9 +475,11 @@ class OSIRISApp(app_manager.RyuApp):
                 node.ports.append(port)
                 self.domain_obj.ports.append(port)
 
-            # self.alive_dict[node.id] = node
-            # self.alive_dict[port.id] = port
+            self.alive_dict[node.id] = node
+            self.alive_dict[port.id] = port
 
+            self.logger.info("Node id:"+node.id)
+            self.logger.info("Port id:" + port.id)
             # Create Node and Port object
             # if node is None:
             #     port = None
@@ -543,7 +583,8 @@ class OSIRISApp(app_manager.RyuApp):
                     self.rt.insert(link, commit=True)
                     self.domain_obj.links.append(link)
 
-                # self.alive_dict[link.id] = link
+                self.logger.info("Link id:"+link.id)
+                self.alive_dict[link.id] = link
         except:
             self.logger.info("EEEEEEEException in create_links ---------")
             self.logger.info(lldp_host_obj.__dict__)
