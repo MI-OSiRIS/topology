@@ -1,6 +1,8 @@
 # Minimal makefile for Sphinx documentation
 #
 
+export PYTHONPATH = $PYTHONPATH:../ryu
+
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build

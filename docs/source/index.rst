@@ -10,3 +10,4 @@ MI-OSiRIS Topology
    :maxdepth: 2
 
    getting_started.rst
+   components.rst
