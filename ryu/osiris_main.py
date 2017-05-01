@@ -63,15 +63,17 @@ class OSIRISApp(app_manager.RyuApp):
         self.datapaths = {}
         self.CONF.register_opts([
             cfg.StrOpt('unis_domain', default=''),
-            cfg.StrOpt('unis_server', default='http://localhost:8888')
+            cfg.StrOpt('unis_server', default='http://localhost:8888'),
+            cfg.StrOpt('unis_update_interval', default='30'),
         ], group="osiris")
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
+        self.interval_secs = int(self.CONF.osiris.unis_update_interval)
+        self.logger.info("----- UPDATE INTERVAL IS %d -------" % self.interval_secs)
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime(unis_server, subscribe=False, defer_update=False)
         self.create_domain()
-        self.interval_secs = 30
         self.update_time_secs = calendar.timegm(time.gmtime())
         self.alive_dict = dict()
         self.switches_dict = dict()
@@ -143,6 +145,7 @@ class OSIRISApp(app_manager.RyuApp):
         del self.switches_dict[switch_object.id]
 
     @set_ev_cls(ofp_event.EventOFPPortStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    @send_updates_decorator
     def _port_state_change_handler(self, ev):
         datapath_obj = ev.datapath
         port_number = ev.port_no
@@ -185,37 +188,14 @@ class OSIRISApp(app_manager.RyuApp):
     @send_updates_decorator
     def switch_features_handler(self, ev):
         self.logger.info("**** switch_features_handler *****")
-        # self.logger.info(ev.msg.version)
-        self.logger.info("*****END INFO*******")
         datapath = ev.msg.datapath
-        # ofproto = datapath.ofproto
-        # parser = datapath.ofproto_parser
-        #
-        # self.logger.info("ofproto.OFP_VERSION:: %s" % ofproto.OFP_VERSION)
-        # if ofproto.OFP_VERSION == 0x01:
-        #     self.logger.info("Version 1.0")
-        # elif ofproto.OFP_VERSION == 0x04:
-        #     self.logger.info("Version 1.3")
-        # else:
-        #     self.logger.info("Some version OF")
-        # install table-miss flow entry
-        #
-        # We specify NO BUFFER to max_len of the output action due to
-        # OVS bug. At this moment, if we specify a lesser number, e.g.,
-        # 128, OVS will send Packet-In with invalid buffer_id and
-        # truncated packet data. In that case, we cannot output packets
-        # correctly.  The bug has been fixed in OVS v2.1.0.
-        # match = parser.OFPMatch()
-        # OFPCML_NO_BUFFER attr not in OF 1.0
-        # if hasattr(ofproto, 'OFPCML_NO_BUFFER'):
-        #     actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
-        #                                   ofproto.OFPCML_NO_BUFFER)]
-        # else:
-        #     actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
-        self.add_flow_new(datapath)
-        # self.add_flow(datapath, 0, match, actions)
+        self.add_default_flow(datapath)
 
     def send_desc_stats_request(self, datapath):
+        """
+            Sends OpenFlow ofp_desc_stats message to get more information about the switch
+        :param datapath: Switch Datapath Object
+        """
         self.logger.info("*****Send send_desc_stats_request*****")
         ofp_parser = datapath.ofproto_parser
         req = ofp_parser.OFPDescStatsRequest(datapath, 0)
@@ -247,12 +227,16 @@ class OSIRISApp(app_manager.RyuApp):
             if len(switch_node.description) == 0:
                 switch_node.description = description_str
 
-    def add_flow_new(self, datapath):
+    def add_default_flow(self, datapath):
+        """
+            Adds Default OF flow to send all LLDP packets to the controller
+        :param datapath: Switch datapath Object
+        """
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
         if ofproto.OFP_VERSION == 0x01:
-            self.logger.info("Version 1.0")
+            self.logger.info("Openflow Version 1.0")
             match = parser.OFPMatch()
             actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL)]
             mod = parser.OFPFlowMod(datapath=datapath, priority=0,
@@ -260,7 +244,7 @@ class OSIRISApp(app_manager.RyuApp):
             datapath.send_msg(mod)
             self.logger.info("Flow configured for 1.0")
         elif ofproto.OFP_VERSION == 0x04:
-            self.logger.info("Version 1.3")
+            self.logger.info("Openflow Version 1.3")
             match = parser.OFPMatch()
             actions = [parser.OFPActionOutput(ofproto.OFPP_NORMAL,
                                                   ofproto.OFPCML_NO_BUFFER)]
@@ -272,21 +256,6 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("Flow configured for 1.3")
         else:
             self.logger.info("Some other version of OF")
-
-    def add_flow(self, datapath, priority, match, actions, buffer_id=None):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
-                                             actions)]
-        if buffer_id:
-            mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id,
-                                    priority=priority, match=match,
-                                    instructions=inst)
-        else:
-            mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-                                    match=match, instructions=inst)
-        datapath.send_msg(mod)
 
     @set_ev_cls(event.EventSwitchEnter)
     @send_updates_decorator
@@ -345,6 +314,12 @@ class OSIRISApp(app_manager.RyuApp):
         switch_node.ports = ports_list
 
     def merge_port_diff(self, port_object, port):
+        """
+            Merges any changes in the port details with the already existing port object
+        :param port_object: Already Existing Port object
+        :param port: port entry from the OF message
+        :return: port_object: Merged port object
+        """
         if port_object.name != port.name.decode("utf-8"):
             self.logger.info("*** ERROR: Port name is different***")
             return None
@@ -385,9 +360,10 @@ class OSIRISApp(app_manager.RyuApp):
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
             lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
-            self.logger.info("***PACKET****")
 
+            # CREATE NODE and PORT
             self.check_add_node_and_port(lldp_host_obj)
+            # CREATE the LINK
             self.create_links(datapath, in_port, lldp_host_obj)
 
 
@@ -482,33 +458,6 @@ class OSIRISApp(app_manager.RyuApp):
 
             self.logger.info("Node id:"+node.id)
             self.logger.info("Port id:" + port.id)
-            # Create Node and Port object
-            # if node is None:
-            #     port = None
-            #     if port_address is not None:
-            #         port = Port({"name": port_name, "address": {"type": port_address_type, "address": port_address}})
-            #     else:
-            #         port = Port({"name": port_name})
-            #     self.rt.insert(port, commit=True)
-            #     # self.domain_obj.ports.append(port)
-            #     node = Node({"name": node_name})
-            #     if lldp_host_obj.system_description is not None:
-            #         node.description = lldp_host_obj.system_description
-            #     node.ports.append(port)
-            #     self.rt.insert(node, commit=True)
-            #     print("*** ADDING TO DOMAIN***")
-            #     self.domain_obj.nodes.append(node)
-            # else:                                                       # Create Port object
-            #     if port_name is not None:                               # In case of LLDP ad from a switch will have no port name
-            #         port = self.check_port_in_node(node, port_name)
-            #         if port is None:
-            #             if port_address is not None:
-            #                 port = Port(
-            #                     {"name": port_name, "address": {"type": port_address_type, "address": port_address}})
-            #             else:
-            #                 port = Port({"name": port_name})
-            #             self.rt.insert(port, commit=True)
-            #             node.ports.append(port)
         except:
             self.logger.info("EEEEEEEException in check_add_node_and_port")
             self.logger.info(lldp_host_obj.__dict__)
@@ -546,30 +495,7 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
             port_name = self.determine_port_name_from_lldp(lldp_host_obj)
             host_port = self.check_port(port_name, node)
-
-            # host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
-
-            # if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            #     dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
-            #     node_name = "switch:" + str(dpid)
-            #     node = self.check_node(node_name)
-            #     host_port = self.find_port(node.ports, port_index=str(lldp_host_obj.port_id))
-            # else:
-            #     node = self.check_node(lldp_host_obj.system_name)
-            #     host_port = self.find_port(node.ports, port_name=lldp_host_obj.port_description)
-
-            # pprint("///////////switch_port/////////")
-            # pprint(switch_port.__dict__)
-
-            # pprint("///////////host_port/////////")
-            # pprint(host_port.__dict__)
-            # CREATE THE LINK
-
             self.logger.info("======Creating a link between ")
-            # self.logger.info(host_port.name)
-            # self.logger.info("AND")
-            # self.logger.info("SWITCH:"+str(dpid))
-            # self.logger.info(switch_port.name)
             self.logger.info("====== END LINK CREATE====")
 
             if switch_port is not None and host_port is not None:
