@@ -45,6 +45,7 @@ import traceback
 import sys
 from ryu import cfg
 import calendar
+from unis import logging
 
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
@@ -57,6 +58,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(OSIRISApp, self).__init__(*args, **kwargs)
+        logging.setLevel(logging.WARN)
         self.mac_to_port = {}
         self.datapaths = {}
         self.CONF.register_opts([
@@ -92,7 +94,7 @@ class OSIRISApp(app_manager.RyuApp):
     def send_switches_updates(self):
         self.logger.info("----- send_switches_updates -------")
         for id_ in self.switches_dict:
-            self.switches_dict[id_].update(force=True)
+            self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
 
     def send_alive_dict_updates(self):
@@ -100,7 +102,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
             self.logger.info("----- id_ : %s -------" % id_)
-            self.alive_dict[id_].update(force=True)
+            self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
 
 
