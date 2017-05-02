@@ -16,29 +16,19 @@ import os
 import six
 import codecs
 import struct
-import traceback
-import sys
 import time
-from pprint import pprint
-
 from ryu.base import app_manager
-
 from ryu.controller.handler import CONFIG_DISPATCHER, \
     MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller import ofp_event
 from ryu.controller.handler import set_ev_cls
 from ryu.topology import event, switches
 from ryu.topology.switches import LLDPPacket
-
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
-
-from ryu import cfg
-from oslo_config.cfg import OptGroup
-
 from unis.models import *
 from unis.runtime import Runtime
 import traceback
@@ -165,7 +155,6 @@ class OSIRISApp(app_manager.RyuApp):
         port_state = port.state
 
         port_object = self.find_port(switch_node.ports, port_index=str(port_number))
-        # self.logger.info('Found port id %s', port_object.id)
 
         if port_state == 1:
             self.logger.info('PORT DELETE')
@@ -419,7 +408,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("Node id:"+node.id)
             self.logger.info("Port id:" + port.id)
         except:
-            self.logger.info("EEEEEEEException in check_add_node_and_port")
+            self.logger.info("Exception in check_add_node_and_port")
             self.logger.info(lldp_host_obj.__dict__)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -455,8 +444,7 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             host_port = self.check_port(port_name, node)
-            self.logger.info("======Creating a link between ")
-            self.logger.info("====== END LINK CREATE====")
+            self.logger.info("======Creating a link =======")
 
             if switch_port is not None and host_port is not None:
                 link_name = switch_port.id + ":" + host_port.id
@@ -474,7 +462,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.info("Link id:"+link.id)
                 self.alive_dict[link.id] = link
         except:
-            self.logger.info("EEEEEEEException in create_links ---------")
+            self.logger.info("Exception in create_links ---------")
             self.logger.info(lldp_host_obj.__dict__)
             exc_type, exc_value, exc_traceback = sys.exc_info()
             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -519,16 +507,11 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_link(self, link_name):
         for link in self.rt.links.where({"name": link_name}):
-            # if link.name == link_name:
             return link
         return None
 
     def check_node(self, node_name):
-        # pprint("Checking NODES")
         for node in self.rt.nodes.where({"name": node_name}):
-            # print(node.name)
-            # if node.name == node_name:
-                # print("found")
             return node
         return None
 
@@ -613,9 +596,6 @@ class LLDPHost:
             elif tlv.tlv_type == lldp.LLDP_TLV_PORT_ID:
                 self.parse_port_id(tlv)
                 # pprint("------LLDP_TLV_PORT_ID-----")
-            elif tlv.tlv_type == lldp.LLDP_TLV_TTL:
-                pass
-                # pprint("------LLDP_TLV_TTL-----")
             elif tlv.tlv_type == lldp.LLDP_TLV_PORT_DESCRIPTION:
                 # pprint("------LLDP_TLV_PORT_DESCRIPTION-----")
                 self.port_description = tlv.tlv_info.decode("utf-8")
