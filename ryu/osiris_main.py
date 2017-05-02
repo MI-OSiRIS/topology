@@ -75,10 +75,18 @@ class OSIRISApp(app_manager.RyuApp):
         self.rt = Runtime(unis_server, subscribe=False, defer_update=False)
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
+        # Transient dict of LLDP-discovered Nodes, Ports and Links which are reset every cycle
         self.alive_dict = dict()
+        # Persistent dict of Switch Nodes, Ports which are not reset every cycle, modified only on OF events
         self.switches_dict = dict()
 
+####### UNIS Update functions #########
     def send_updates_decorator(func):
+        """
+            This is a decorator which needs to be called when any event occurs, which basically updates UNIS
+            about objects whose ts has to be updated
+        :return:
+        """
         def func_wrapper(self, *args, **kwargs):
             self.send_updates()
             func(self, *args, **kwargs)
@@ -90,33 +98,33 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("----- UPDATING UNIS DB -------")
         self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
         self.send_alive_dict_updates()
-        self.alive_dict = dict()
         self.send_switches_updates()
 
     def send_switches_updates(self):
+        """
+            Updates of Switch Nodes, Ports which are not reset every cycle
+        :return:
+        """
         self.logger.info("----- send_switches_updates -------")
         for id_ in self.switches_dict:
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
 
     def send_alive_dict_updates(self):
+        """
+            Updates of LLDP discovered nodes, ports and links which are reset every cycle
+        :return:
+        """
         self.logger.info("----- send_alive_dict_updates -------")
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
             self.logger.info("----- id_ : %s -------" % id_)
             self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
+        # reset
+        self.alive_dict = dict()
 
-
-    def create_domain(self):
-        try:
-            domain_obj = next(self.rt.domains.where(lambda x: x.name == self.domain_name))
-        except StopIteration:
-            self.logger.info("CREATING A NEW DOMAIN")
-            domain_obj = Domain({"name": self.domain_name})
-            self.rt.insert(domain_obj, commit=True)
-        self.domain_obj = domain_obj
-        
+########### OpenFlow event Handlers #############
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
     @send_updates_decorator
@@ -132,17 +140,13 @@ class OSIRISApp(app_manager.RyuApp):
                 del self.datapaths[datapath.id]
                 self.deregister_switch(datapath)
 
-    def deregister_switch(self, datapath):
-        self.logger.debug('deregister_switch datapath: %s', datapath.id)
-        self.logger.debug(self.check_node('switch:'+str(datapath.id)))
-        switch_object = self.check_node('switch:' + str(datapath.id))
-
-        # Remove the port entries
-        for port_obj in switch_object.ports:
-            del self.switches_dict[port_obj.id]
-        #
-        # # Remove the node entry from switches dict
-        del self.switches_dict[switch_object.id]
+    @set_ev_cls(event.EventSwitchEnter)
+    @send_updates_decorator
+    def switch_enter_handler(self, ev):
+        self.logger.info("**** switch_enter_handler *****")
+        self.check_add_switch(ev.switch, ev.switch.dp)
+        self.send_desc_stats_request(ev.switch.dp)
+        self.logger.info("**** switch_enter_handler done*****")
 
     @set_ev_cls(ofp_event.EventOFPPortStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
     @send_updates_decorator
@@ -191,15 +195,6 @@ class OSIRISApp(app_manager.RyuApp):
         datapath = ev.msg.datapath
         self.add_default_flow(datapath)
 
-    def send_desc_stats_request(self, datapath):
-        """
-            Sends OpenFlow ofp_desc_stats message to get more information about the switch
-        :param datapath: Switch Datapath Object
-        """
-        self.logger.info("*****Send send_desc_stats_request*****")
-        ofp_parser = datapath.ofproto_parser
-        req = ofp_parser.OFPDescStatsRequest(datapath, 0)
-        datapath.send_msg(req)
 
     @set_ev_cls(ofp_event.EventOFPDescStatsReply, MAIN_DISPATCHER)
     def desc_stats_reply_handler(self, ev):
@@ -226,6 +221,69 @@ class OSIRISApp(app_manager.RyuApp):
                 description_str = description_str[:-1]
             if len(switch_node.description) == 0:
                 switch_node.description = description_str
+
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    @send_updates_decorator
+    def _packet_in_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+
+        # get Datapath ID to identify OpenFlow switches.
+        dpid = datapath.id
+        self.logger.info("********dpid********" + str(dpid))
+        self.mac_to_port.setdefault(dpid, {})
+
+        # analyse the received packets using the packet library.
+        pkt = packet.Packet(msg.data)
+        eth_pkt = pkt.get_protocol(ethernet.ethernet)
+        dst = eth_pkt.dst
+        src = eth_pkt.src
+
+        # get the received port number from packet_in message.
+        in_port = msg.match['in_port']
+
+        if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
+            self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
+            lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
+
+            # CREATE NODE and PORT
+            self.check_add_node_and_port(lldp_host_obj)
+            # CREATE the LINK
+            self.create_links(datapath, in_port, lldp_host_obj)
+
+######### INIT helper functions ########
+    def create_domain(self):
+        try:
+            domain_obj = next(self.rt.domains.where(lambda x: x.name == self.domain_name))
+        except StopIteration:
+            self.logger.info("CREATING A NEW DOMAIN")
+            domain_obj = Domain({"name": self.domain_name})
+            self.rt.insert(domain_obj, commit=True)
+        self.domain_obj = domain_obj
+
+    def send_desc_stats_request(self, datapath):
+        """
+            Sends OpenFlow ofp_desc_stats message to get more information about the switch
+        :param datapath: Switch Datapath Object
+        """
+        self.logger.info("*****Send send_desc_stats_request*****")
+        ofp_parser = datapath.ofproto_parser
+        req = ofp_parser.OFPDescStatsRequest(datapath, 0)
+        datapath.send_msg(req)
+
+    def deregister_switch(self, datapath):
+        self.logger.debug('deregister_switch datapath: %s', datapath.id)
+        self.logger.debug(self.check_node('switch:'+str(datapath.id)))
+        switch_object = self.check_node('switch:' + str(datapath.id))
+
+        # Remove the port entries
+        for port_obj in switch_object.ports:
+            del self.switches_dict[port_obj.id]
+        #
+        # # Remove the node entry from switches dict
+        del self.switches_dict[switch_object.id]
 
     def add_default_flow(self, datapath):
         """
@@ -257,14 +315,7 @@ class OSIRISApp(app_manager.RyuApp):
         else:
             self.logger.info("Some other version of OF")
 
-    @set_ev_cls(event.EventSwitchEnter)
-    @send_updates_decorator
-    def switch_enter_handler(self, ev):
-        self.logger.info("**** switch_enter_handler *****")
-        self.check_add_switch(ev.switch, ev.switch.dp)
-        self.send_desc_stats_request(ev.switch.dp)
-        self.logger.info("**** switch_enter_handler done*****")
-
+######### Main Event processing functions #########
     def check_add_switch(self, switch, datapath):
         """
             This function adds the switch as a Node into the specified domain into UNIS.
@@ -313,97 +364,6 @@ class OSIRISApp(app_manager.RyuApp):
             ports_list.append(port_object)
         switch_node.ports = ports_list
 
-    def merge_port_diff(self, port_object, port):
-        """
-            Merges any changes in the port details with the already existing port object
-        :param port_object: Already Existing Port object
-        :param port: port entry from the OF message
-        :return: port_object: Merged port object
-        """
-        if port_object.name != port.name.decode("utf-8"):
-            self.logger.info("*** ERROR: Port name is different***")
-            return None
-        if port_object.index != str(port.port_no):
-            port_object.index = str(port.port_no)
-        if port_object.address.address != port.hw_addr:
-            port_object.address.address = port.hw_addr
-        return port_object
-
-    def check_port(self, port_name, switch_node):
-        for port in switch_node.ports:
-            if port.name == port_name:
-                return port
-        return None
-
-    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
-    @send_updates_decorator
-    def _packet_in_handler(self, ev):
-        msg = ev.msg
-        datapath = msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        # get Datapath ID to identify OpenFlow switches.
-        dpid = datapath.id
-        self.logger.info("********dpid********"+str(dpid))
-        self.mac_to_port.setdefault(dpid, {})
-
-        # analyse the received packets using the packet library.
-        pkt = packet.Packet(msg.data)
-        eth_pkt = pkt.get_protocol(ethernet.ethernet)
-        dst = eth_pkt.dst
-        src = eth_pkt.src
-
-        # get the received port number from packet_in message.
-        in_port = msg.match['in_port']
-
-        if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
-            self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
-            lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
-
-            # CREATE NODE and PORT
-            self.check_add_node_and_port(lldp_host_obj)
-            # CREATE the LINK
-            self.create_links(datapath, in_port, lldp_host_obj)
-
-
-    def get_dpid_from_chassis_id(self, chassis_id):
-        "Will be in the format dpid:0000080027c11115, to be converted to decimal of 0000080027c11115"
-        dec_value = int(chassis_id[5:], 16)
-        # print("get_dpid_from_chassis_id", dec_value)
-        return dec_value
-
-    def determine_node_name_from_lldp(self, lldp_host_obj):
-        """
-            Implement Fallbacks for Node Name determination from the LLDP objects
-        :param lldp_host_obj:
-        :return: node_name or None if can be determined
-        """
-        node_name = None
-        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            # print("////// FOUND SWITCH AS NODE /////")
-            dpid = self.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
-            node_name = "switch:" + str(dpid)
-        elif lldp_host_obj.system_name is not None:
-            # print("////// FOUND HOST AS NODE /////")
-            node_name = lldp_host_obj.system_name
-        elif lldp_host_obj.chassis_id is not None:
-            node_name = "device:"+str(lldp_host_obj.chassis_id)
-        return node_name
-
-    def determine_port_name_from_lldp(self, lldp_host_obj):
-        """
-            Implement Fallbacks for Port Name determination from the LLDP objects
-        :param lldp_host_obj:
-        :return: port_name or None if can be determined
-        """
-        port_name = None
-        if lldp_host_obj.port_description is not None:
-            port_name = lldp_host_obj.port_description
-        elif lldp_host_obj.port_id is not None:
-            port_name = "port:"+str(lldp_host_obj.port_id)
-        return port_name
-
     def check_add_node_and_port(self, lldp_host_obj):
         """
             Creates UNIS Nodes and Ports from the LLDPHost information provided.
@@ -417,7 +377,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("**check_add_node_and_port***")
         try:
             # Node Details
-            node_name = self.determine_node_name_from_lldp(lldp_host_obj)
+            node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             if node_name is None:
                 self.logger.error("LLDP Node cannot be added due to insufficient information.")
                 return
@@ -425,7 +385,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             # Port details
             # Currently this assumes 1:1 between Nodes and Ports
-            port_name = self.determine_port_name_from_lldp(lldp_host_obj)
+            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             if port_name is None or lldp_host_obj.port_id is None:
                 self.logger.error("LLDP Node's port cannot be added due to insufficient information.")
                 return
@@ -491,9 +451,9 @@ class OSIRISApp(app_manager.RyuApp):
                             break
 
             # FIND THE OTHER NODE/PORT
-            node_name = self.determine_node_name_from_lldp(lldp_host_obj)
+            node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             node = self.check_node(node_name)
-            port_name = self.determine_port_name_from_lldp(lldp_host_obj)
+            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             host_port = self.check_port(port_name, node)
             self.logger.info("======Creating a link between ")
             self.logger.info("====== END LINK CREATE====")
@@ -519,6 +479,29 @@ class OSIRISApp(app_manager.RyuApp):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
             self.logger.error(''.join(line for line in lines))
+
+######## Main Event processing helper functions ##########
+    def merge_port_diff(self, port_object, port):
+        """
+            Merges any changes in the port details with the already existing port object
+        :param port_object: Already Existing Port object
+        :param port: port entry from the OF message
+        :return: port_object: Merged port object
+        """
+        if port_object.name != port.name.decode("utf-8"):
+            self.logger.info("*** ERROR: Port name is different***")
+            return None
+        if port_object.index != str(port.port_no):
+            port_object.index = str(port.port_no)
+        if port_object.address.address != port.hw_addr:
+            port_object.address.address = port.hw_addr
+        return port_object
+
+    def check_port(self, port_name, switch_node):
+        for port in switch_node.ports:
+            if port.name == port_name:
+                return port
+        return None
 
     def find_port(self, ports, port_name=None, port_index=None):
         """
@@ -554,6 +537,49 @@ class OSIRISApp(app_manager.RyuApp):
             if port.name == port_name:
                 return port
         return None
+
+class LLDPUtils:
+
+    @staticmethod
+    def get_dpid_from_chassis_id(chassis_id):
+        "Will be in the format dpid:0000080027c11115, to be converted to decimal of 0000080027c11115"
+        dec_value = int(chassis_id[5:], 16)
+        # print("get_dpid_from_chassis_id", dec_value)
+        return dec_value
+
+    @staticmethod
+    def determine_node_name_from_lldp(lldp_host_obj):
+        """
+            Implement Fallbacks for Node Name determination from the LLDP objects
+        :param lldp_host_obj:
+        :return: node_name or None if can be determined
+        """
+        node_name = None
+        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
+            # print("////// FOUND SWITCH AS NODE /////")
+            dpid = LLDPUtils.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
+            node_name = "switch:" + str(dpid)
+        elif lldp_host_obj.system_name is not None:
+            # print("////// FOUND HOST AS NODE /////")
+            node_name = lldp_host_obj.system_name
+        elif lldp_host_obj.chassis_id is not None:
+            node_name = "device:"+str(lldp_host_obj.chassis_id)
+        return node_name
+
+    @staticmethod
+    def determine_port_name_from_lldp(lldp_host_obj):
+        """
+            Implement Fallbacks for Port Name determination from the LLDP objects
+        :param lldp_host_obj:
+        :return: port_name or None if can be determined
+        """
+        port_name = None
+        if lldp_host_obj.port_description is not None:
+            port_name = lldp_host_obj.port_description
+        elif lldp_host_obj.port_id is not None:
+            port_name = "port:"+str(lldp_host_obj.port_id)
+        return port_name
+
 
 class LLDPHost:
 
