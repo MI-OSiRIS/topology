@@ -41,6 +41,45 @@ from unis import logging
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
 PATH = os.path.dirname(__file__)
 
+@lldp.lldp.set_tlv_type(lldp.LLDP_TLV_SYSTEM_CAPABILITIES)
+class SystemCapabilities(lldp.LLDPBasicTLV):
+    # chassis subtype(1) + system cap(2) + enabled cap(2)
+    _PACK_STR = '!HH'
+    _PACK_SIZE = struct.calcsize(_PACK_STR)
+    _LEN_MIN = _PACK_SIZE
+    _LEN_MAX = _PACK_SIZE
+
+    # System Capabilities
+    CAP_REPEATER = (1 << 1)             # IETF RFC 2108
+    CAP_MAC_BRIDGE = (1 << 2)           # IEEE Std 802.1D
+    CAP_WLAN_ACCESS_POINT = (1 << 3)    # IEEE Std 802.11 MIB
+    CAP_ROUTER = (1 << 4)               # IETF RFC 1812
+    CAP_TELEPHONE = (1 << 5)            # IETF RFC 4293
+    CAP_DOCSIS = (1 << 6)               # IETF RFC 4639 and IETF RFC 4546
+    CAP_STATION_ONLY = (1 << 7)         # IETF RFC 4293
+    CAP_CVLAN = (1 << 8)                # IEEE Std 802.1Q
+    CAP_SVLAN = (1 << 9)                # IEEE Std 802.1Q
+    CAP_TPMR = (1 << 10)                # IEEE Std 802.1Q
+
+    def __init__(self, buf=None, *args, **kwargs):
+        super(SystemCapabilities, self).__init__(buf, *args, **kwargs)
+        if buf:
+            self.subtype = 0
+            (self.system_cap, self.enabled_cap) = \
+                struct.unpack(self._PACK_STR, self.tlv_info[:self._PACK_SIZE])
+        else:
+            self.subtype = kwargs['subtype']
+            self.system_cap = kwargs['system_cap']
+            self.enabled_cap = kwargs['enabled_cap']
+            self.len = self._PACK_SIZE
+            assert self._len_valid()
+            self.typelen = (self.tlv_type << LLDP_TLV_TYPE_SHIFT) | self.len
+
+    def serialize(self):
+        return struct.pack('!HBHH',
+                           self.typelen, self.subtype,
+                           self.system_cap, self.enabled_cap)
+
 class OSIRISApp(app_manager.RyuApp):
     _CONTEXTS = {
         'switches': switches.Switches
