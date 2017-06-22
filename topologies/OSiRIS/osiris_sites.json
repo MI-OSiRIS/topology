@@ -4,23 +4,20 @@
   "description": "OSiRIS Topology description",
   "domains": [
     {
-      "href": "http://dev.crest.iu.edu:8888/domains/58af2137e7798971725bbd78",
+      "href": "http://iu-ps01.osris.org:8888/domains/e6584d66-f53a-4372-890a-ee4d7c0616b3",
       "rel": "full"
     },
-    {
-      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-      "description": "UM Domain",
-      "name": "UM"
+    { 
+      "href": "http://um-ps01.osris.org:8888/domains/418790b4-5e7e-40bc-add7-bf37960a82da",
+      "rel": "full"
     },
-    {
-      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-      "description": "WSU Domain",
-      "name": "WSU"
+    { 
+      "href": "http://msu-ps01.osris.org:8888/domains/b983f33d-cd91-4da2-95b4-b2d2799f7e2f",
+      "rel": "full"
     },
-    {
-      "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
-      "description": "MSU Domain",
-      "name": "MSU"
+    { 
+      "href": "http://wsu-ps01.osris.org:8888/domains/be830c11-ebbd-4daf-b544-25f7f6360ae8",
+      "rel": "full"
     },
     {
       "$schema": "http://unis.crest.iu.edu/schema/20160630/domain#",
@@ -33,25 +30,7 @@
       "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
       "name": "link-IU-CHIC",
       "directed": false,
-      "endpoints": [{"href" : "http://dev.crest.iu.edu:8888/domains/58af2137e7798971725bbd78",
-		     "rel": "full"},
-		    {"href" : "#/domains/4",
-		     "rel": "full"}]
-    },
-    {
-      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-      "name": "link-MSU-CHIC",
-      "directed": false,
-      "endpoints": [{"href" : "$.domains[?(@.name==\"MSU\")]",
-		     "rel": "full"},
-		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
-		     "rel": "full"}]
-    },
-    {
-      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
-      "name": "link-WSU-CHIC",
-      "directed": false,
-      "endpoints": [{"href" : "$.domains[?(@.name==\"WSU\")]",
+      "endpoints": [{"href" : "http://iu-ps01.osris.org:8888/domains/e6584d66-f53a-4372-890a-ee4d7c0616b3",
 		     "rel": "full"},
 		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
 		     "rel": "full"}]
@@ -60,7 +39,25 @@
       "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
       "name": "link-UM-CHIC",
       "directed": false,
-      "endpoints": [{"href" : "$.domains[?(@.name==\"UM\")]",
+      "endpoints": [{"href" : "http://um-ps01.osris.org:8888/domains/418790b4-5e7e-40bc-add7-bf37960a82da",
+		     "rel": "full"},
+		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
+		     "rel": "full"}]
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-MSU-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "http://msu-ps01.osris.org:8888/domains/b983f33d-cd91-4da2-95b4-b2d2799f7e2f",
+		     "rel": "full"},
+		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
+		     "rel": "full"}]
+    },
+    {
+      "$schema": "http://unis.crest.iu.edu/schema/20160630/link#",
+      "name": "link-WSU-CHIC",
+      "directed": false,
+      "endpoints": [{"href" : "http://wsu-ps01.osris.org:8888/domains/be830c11-ebbd-4daf-b544-25f7f6360ae8",
 		     "rel": "full"},
 		    {"href" : "$.domains[?(@.name==\"CHIC PoP\")]",
 		     "rel": "full"}]
