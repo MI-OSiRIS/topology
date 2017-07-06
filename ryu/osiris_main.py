@@ -1,22 +1,24 @@
 """
-    This is a RYU application which builds Dynamic Network Topology information from all the Openflow switches connected to this RYU controller.
-    The Topology information is automatically pushed to UNIS server using UNISRt.
-    The Topology information Nodes, Ports and Links will be part of the Domain name specified.
-To RUN:
-ryu-manager ./osiris_main.py --default-log-level=1 --install-lldp-flow --observe-links --ofp-tcp-listen-port=<Openflow-port>
---osiris_main-domain <UNIS_DOMAIN_NAME> --osiris_main-unis_server <UNIS_HOST_IP>:<UNIS_HOST_PORT>
+    This is a RYU application which builds Dynamic Network Topology
+    information from all the Openflow switches connected to this
+    RYU controller.
+    The Topology information is automatically pushed to UNIS server
+    using UNISRt. The topology Nodes, Ports and Links will be part of
+    the Domain name specified.
 
-Requirements:
-* Python3
-* UNISRt package installed
-
+    See http://github.com/MI-OSIRIS/topology for more information.
 """
 
 import os
+import sys
 import six
 import codecs
 import struct
 import time
+import traceback
+import calendar
+import logging
+
 from ryu.base import app_manager
 from ryu.controller.handler import CONFIG_DISPATCHER, \
     MAIN_DISPATCHER, DEAD_DISPATCHER
@@ -29,13 +31,15 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
+from ryu import cfg
+
 from unis.models import *
 from unis.runtime import Runtime
-import traceback
-import sys
-from ryu import cfg
-import calendar
-from unis import logging
+from unis import logging as ulog
+
+# turn down various loggers
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("libdlt").setLevel(logging.WARNING)
 
 #Create OFSwitchNode class
 OFSwitchNode = schemaLoader.get_class("http://unis.crest.iu.edu/schema/ext/ofswitch/1/ofswitch#")
@@ -87,7 +91,6 @@ class OSIRISApp(app_manager.RyuApp):
 
     def __init__(self, *args, **kwargs):
         super(OSIRISApp, self).__init__(*args, **kwargs)
-        logging.setLevel(logging.WARN)
         self.mac_to_port = {}
         self.datapaths = {}
         self.CONF.register_opts([
@@ -101,7 +104,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("----- UPDATE INTERVAL IS %d -------" % self.interval_secs)
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime(unis_server, subscribe=False, defer_update=False)
+        self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
         # Transient dict of LLDP-discovered Nodes, Ports and Links which are reset every cycle
