@@ -287,7 +287,7 @@ class OSIRISApp(app_manager.RyuApp):
 ######### INIT helper functions ########
     def create_domain(self):
         try:
-            domain_obj = next(self.rt.domains.where(lambda x: x.name == self.domain_name))
+            domain_obj = next(self.rt.domains.where(lambda x: getattr(x, "name", None) == self.domain_name))
         except StopIteration:
             self.logger.info("CREATING A NEW DOMAIN")
             domain_obj = Domain({"name": self.domain_name})
@@ -369,23 +369,26 @@ class OSIRISApp(app_manager.RyuApp):
         if switch_node is None:
             self.logger.info("*** NEW SWITCH***")
             switch_node = OFSwitchNode({"name": switch_name, "datapathid": str(datapath.id)})
+            self.logger.info("SWITCH NAME: %s | DATAPATH: %s \n" % (switch_node.name, switch_node.datapathid))
             if datapath.address is not None:
                 switch_node.mgmtaddress = datapath.address[0]
             self.rt.insert(switch_node, commit=True)
-            self.logger.info("*** ADDING TO DOMAIN***")
+            self.logger.info("*** ADDING TO DOMAIN***\n")
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
         self.switches_dict[switch_node.id] = switch_node
-        self.logger.info("**** Adding the ports *****")
+        self.logger.info("**** Adding the ports *****\n")
         # Ports
         for port in switch.ports:
             # Search by Port Name
-            port_object = self.check_port(port.name, switch_node)
+            port_object = self.check_port(port.name.decode('utf-8'), switch_node)
             if port_object is None:
-                self.logger.info("****NEW PORT***")
+                self.logger.info("!****NEW PORT***!")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
+                self.logger.info("PORT NAME: %s | INDEX: %s | ADDRESS: %s \n"
+                    % (port_object.name, port_object.index, port_object.address.address))
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
                 self.switches_dict[port_object.id] = port_object
@@ -528,9 +531,13 @@ class OSIRISApp(app_manager.RyuApp):
         return port_object
 
     def check_port(self, port_name, switch_node):
+        self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
         for port in switch_node.ports:
+            # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
+            # as a byte string, which will always fail tests against port.name UTF-8 format.
             if port.name == port_name:
                 return port
+        self.logger.info("PORT %s NOT FOUND IN SWITCH %s" % (port_name, switch_node.name))
         return None
 
     def find_port(self, ports, port_name=None, port_index=None):
