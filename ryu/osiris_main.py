@@ -18,6 +18,7 @@ import time
 import traceback
 import calendar
 import logging
+import pprint
 
 from ryu.base import app_manager
 from ryu.controller.handler import CONFIG_DISPATCHER, \
@@ -96,7 +97,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.CONF.register_opts([
             cfg.StrOpt('unis_domain', default=''),
             cfg.StrOpt('unis_server', default='http://localhost:8888'),
-            cfg.StrOpt('unis_update_interval', default='30'),
+            cfg.StrOpt('unis_update_interval', default='5'),
         ], group="osiris")
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
@@ -132,15 +133,24 @@ class OSIRISApp(app_manager.RyuApp):
         self.send_alive_dict_updates()
         self.send_switches_updates()
 
+    def send_updates_force(self):
+        self.logger.info("----- UPDATING UNIS DB -------")
+        self.update_time_secs = calendar.timegm(time.gmtime()) + self.interval_secs
+        self.send_alive_dict_updates()
+        self.send_switches_updates()
+
+
     def send_switches_updates(self):
         """
             Updates of Switch Nodes, Ports which are not reset every cycle
         :return:
         """
+
         self.logger.info("----- send_switches_updates -------")
         for id_ in self.switches_dict:
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
+
 
     def send_alive_dict_updates(self):
         """
@@ -151,6 +161,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
             self.logger.info("----- id_ : %s -------" % id_)
+
             self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
@@ -185,6 +196,8 @@ class OSIRISApp(app_manager.RyuApp):
     def _port_state_change_handler(self, ev):
         datapath_obj = ev.datapath
         port_number = ev.port_no
+        print("PORT NUMBER: %s" % port_number)
+        print("EV: %s" % ev)
         reason = ev.reason
         ofproto = datapath_obj.ofproto
         self.logger.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&_port_state_change_handler")
@@ -193,12 +206,13 @@ class OSIRISApp(app_manager.RyuApp):
         switch_name = "switch:"+str(datapath_obj.id)
         switch_node = self.check_node(switch_name)
         self.logger.info('Found switch id %s', switch_node.id)
+
         port = datapath_obj.ports[port_number]
+        print(port)
+        port_object = self.find_port(switch_node.ports, port_index=str(port_number))
         port_state = port.state
 
-        port_object = self.find_port(switch_node.ports, port_index=str(port_number))
-
-        if port_state == 1:
+        if port_state == 0:
             self.logger.info('PORT DELETE')
             self.logger.info(port_object)
             if port_object is not None and port_object.id in self.switches_dict:
@@ -211,12 +225,13 @@ class OSIRISApp(app_manager.RyuApp):
                 if port_object.id not in self.switches_dict:
                     self.switches_dict[port_object.id] = port_object
             else:
+                # PORT OBJECT NEEDS AN ID, DOESNT GET ADDED TO SWITCH WITHOUT ONE
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
                 self.switches_dict[port_object.id] = port_object
-                self.logger.info('PORT ADDED with %d number and %s id', port_number, port_object.id)
+                self.logger.info('PORT ADDED with %d port number and %s id', port_number, port_object.id)
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -234,6 +249,7 @@ class OSIRISApp(app_manager.RyuApp):
         :param ev:
         :return:
         """
+        print("EVALUATION:", ev)
         self.logger.info("****desc_stats_reply_handler   ******"+str(ev.msg.datapath.id))
         body = ev.msg.body
         switch_node = self.check_node("switch:"+str(ev.msg.datapath.id))
@@ -374,6 +390,9 @@ class OSIRISApp(app_manager.RyuApp):
                 switch_node.mgmtaddress = datapath.address[0]
             self.rt.insert(switch_node, commit=True)
             self.logger.info("*** ADDING TO DOMAIN***\n")
+
+            # get the node back out of UNIS after commit so it is treated as a UNIS object.
+            switch_node = self.check_node(switch_name)
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
@@ -381,22 +400,59 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("**** Adding the ports *****\n")
         # Ports
         for port in switch.ports:
-            # Search by Port Name
+
+            # Search by Port Name - checks if port is already attached to our node.
             port_object = self.check_port(port.name.decode('utf-8'), switch_node)
+
             if port_object is None:
+
+                # see if the port is already in UNIS
+                port_object = self.find_port(self.domain_obj.ports, port.name.decode("utf-8"), port.port_no)
+
+                # Check to see if port is already in UNIS and then add it to the Switch
+                # TODO: check by port MAC address instead of port.name to avoid complications in the future
+                if port_object is not None:
+                    self.logger.info("\nPORT NAME: %s ALREADY IN UNIS PORT DB BUT NOT IN SWITCH\n" % port_object.name)
+                    # Add port to switch now, if this IF statement is validated it means the port
+                    # was incorrectly not added to the switch previously and is already in UNIS
+                    ports_list.append(port_object)
+                    self.logger.info("ADDING PORT TO SWITCH UNIS OBJECT %s \n" % self.domain_obj.name)
+                    # add port to Ports in Unis, update objects
+                    for id in self.switches_dict:
+                        print(self.switches_dict[id])
+                    continue # move on to testing the next port
+
                 self.logger.info("!****NEW PORT***!")
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
                     {"address": port.hw_addr, "type": "mac"}})
-                self.logger.info("PORT NAME: %s | INDEX: %s | ADDRESS: %s \n"
+
+
+                self.logger.info("PORT NAME: %s | PORT NUMBER: %s | ADDRESS: %s \n"
                     % (port_object.name, port_object.index, port_object.address.address))
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
+
                 self.switches_dict[port_object.id] = port_object
             else:
-                self.logger.info("****OLD PORT***")
+                self.logger.info("\n****OLD PORT***")
+
+                # The following line is a temporary fix so the merge function works correctly
+                port_object = self.find_port(self.domain_obj.ports, port.name.decode("utf-8"), port.port_no)
                 port_object = self.merge_port_diff(port_object, port)
+
             ports_list.append(port_object)
+
+        # update the switch with the new list of ports
         switch_node.ports = ports_list
+        print(switch_node.ports)
+        print("\nSWITCH NODE UPDATE - \n %s", switch_node)
+        print("SWITCH DICT: %s" % self.switches_dict)
+        self.switches_dict[switch_node.id].ports = ports_list
+
+        # manually make changes due to defered update
+        switch_node.update(force=True)
+        self.rt.flush()
+
 
     def check_add_node_and_port(self, lldp_host_obj):
         """
@@ -418,7 +474,8 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
 
             # Port details
-            # Currently this assumes 1:1 between Nodes and Ports
+            # Currently this assumes 1:1 between Nodes and Ports <- 9/8/17 This assumption is the source of all the big problems
+            # in Ryu D:
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             if port_name is None or lldp_host_obj.port_id is None:
                 self.logger.error("LLDP Node's port cannot be added due to insufficient information.")
@@ -521,6 +578,7 @@ class OSIRISApp(app_manager.RyuApp):
         :param port: port entry from the OF message
         :return: port_object: Merged port object
         """
+        print(port_object.name, port.name.decode('utf-8'))
         if port_object.name != port.name.decode("utf-8"):
             self.logger.info("*** ERROR: Port name is different***")
             return None
@@ -532,12 +590,18 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port(self, port_name, switch_node):
         self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
+        found = 0
         for port in switch_node.ports:
             # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
             # as a byte string, which will always fail tests against port.name UTF-8 format.
             if port.name == port_name:
-                return port
-        self.logger.info("PORT %s NOT FOUND IN SWITCH %s" % (port_name, switch_node.name))
+                found += 1
+        if found == 1:
+            return port
+        elif found > 1:
+            return self.logger.info("PORT %s ALREADY FOUND IN SWITCH", port.name)
+        else:
+            self.logger.info("PORT %s NOT FOUND IN SWITCH %s" % (port_name, switch_node.name))
         return None
 
     def find_port(self, ports, port_name=None, port_index=None):
@@ -553,6 +617,20 @@ class OSIRISApp(app_manager.RyuApp):
                 return port
             if port_name is not None and port_name == port.name:
                 return port
+
+    def find_switch(self, switches, port_name=None, port_index=None):
+        """
+            Returns the first instance of Switch Object which matches any condition
+        :param switches:
+        :param switch_name:
+        :param switch_index:
+        :return: Switch Object
+        """
+        for switch in switches:
+            if switch_index is not None and switch_index == switch.index:
+                return switch
+            if switch_name is not None and switch_name == switch.name:
+                return switch
 
     def check_link(self, link_name):
         for link in self.rt.links.where({"name": link_name}):
