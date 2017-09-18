@@ -33,7 +33,7 @@ from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
 from ryu import cfg
-
+import unis
 from unis.models import *
 from unis.runtime import Runtime
 from unis import logging as ulog
@@ -106,6 +106,10 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
+        #UnisRT debug lines
+        #unis.logging.setLevel(unis.logging.DEBUG)
+        #unis.logging.doTrace(True)
+        ###### end debug lines
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
         # Transient dict of LLDP-discovered Nodes, Ports and Links which are reset every cycle
@@ -198,6 +202,7 @@ class OSIRISApp(app_manager.RyuApp):
         port_number = ev.port_no
         print("PORT NUMBER: %s" % port_number)
         print("EV: %s" % ev)
+        print(ev.reason)
         reason = ev.reason
         ofproto = datapath_obj.ofproto
         self.logger.info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&_port_state_change_handler")
@@ -207,17 +212,28 @@ class OSIRISApp(app_manager.RyuApp):
         switch_node = self.check_node(switch_name)
         self.logger.info('Found switch id %s', switch_node.id)
 
-        port = datapath_obj.ports[port_number]
-        print(port)
+        # test if the port is in the datapath, if it is not it means it has been deleted
+        try:
+            port = datapath_obj.ports[port_number]
+            print(port)
+            port_state = port.state
+        except Exception:
+            port_state = 0
+
         port_object = self.find_port(switch_node.ports, port_index=str(port_number))
-        port_state = port.state
+
 
         if port_state == 0:
             self.logger.info('PORT DELETE')
-            self.logger.info(port_object)
-            if port_object is not None and port_object.id in self.switches_dict:
+            # checks node for port on whatever port number EV said was deleted and removes it.
+            check = self.check_port_in_node_by_port_number(switch_node, str(port_number))
+            print("Checking port result: %s" % check)
+            if check is not None:
                 del self.switches_dict[port_object.id]
                 self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
+            #if port_object is not None and port_object.id in self.switches_dict:
+            #    del self.switches_dict[port_object.id]
+            #    self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
         else:
             self.logger.info('PORT ADD or MODIFY')
             if port_object is not None:
@@ -415,11 +431,16 @@ class OSIRISApp(app_manager.RyuApp):
                     self.logger.info("\nPORT NAME: %s ALREADY IN UNIS PORT DB BUT NOT IN SWITCH\n" % port_object.name)
                     # Add port to switch now, if this IF statement is validated it means the port
                     # was incorrectly not added to the switch previously and is already in UNIS
+                    print("PORT NUMBER: %s" % port.port_no)
+
+                    # updates unis port object with the correct port number. Unfortunately the schema is a string..
+                    port_object.index = str(port.port_no)
+                    port_object.update(force=True)
+
                     ports_list.append(port_object)
+
                     self.logger.info("ADDING PORT TO SWITCH UNIS OBJECT %s \n" % self.domain_obj.name)
-                    # add port to Ports in Unis, update objects
-                    for id in self.switches_dict:
-                        print(self.switches_dict[id])
+
                     continue # move on to testing the next port
 
                 self.logger.info("!****NEW PORT***!")
@@ -612,6 +633,7 @@ class OSIRISApp(app_manager.RyuApp):
         :param port_index:
         :return: Port Object
         """
+
         for port in ports:
             if port_index is not None and port_index == port.index:
                 return port
@@ -645,6 +667,13 @@ class OSIRISApp(app_manager.RyuApp):
     def check_port_in_node(self, node, port_name):
         for port in node.ports:
             if port.name == port_name:
+                return port
+        return None
+
+    def check_port_in_node_by_port_number(self, node, port_number):
+        for port in node.ports:
+            print(port)
+            if port.index == port_number:
                 return port
         return None
 
