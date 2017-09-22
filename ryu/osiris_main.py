@@ -433,13 +433,17 @@ class OSIRISApp(app_manager.RyuApp):
                 switch_node.mgmtaddress = datapath.address[0]
             self.rt.insert(switch_node, commit=True)
             self.logger.info("*** ADDING TO DOMAIN***\n")
+            self.switches_dict[switch_node.id] = switch_node
 
+            # if the node is brand new we need to flush
+            self.rt.flush()
             # get the node back out of UNIS after commit so it is treated as a UNIS object.
             switch_node = self.check_node(switch_name)
             self.domain_obj.nodes.append(switch_node)
         else:
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
         self.switches_dict[switch_node.id] = switch_node
+
         self.logger.info("**** Adding the ports *****\n")
 
         # Ports
@@ -480,7 +484,6 @@ class OSIRISApp(app_manager.RyuApp):
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
 
-                self.switches_dict[port_object.id] = port_object
             else:
                 self.logger.info("\n****OLD PORT***")
 
