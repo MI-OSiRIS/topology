@@ -37,6 +37,7 @@ import unis
 from unis.models import *
 from unis.runtime import Runtime
 from unis import logging as ulog
+from unis.models.models import UnisList
 
 # turn down various loggers
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -152,6 +153,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         self.logger.info("----- send_switches_updates -------")
         for id_ in self.switches_dict:
+            print(self.switches_dict[id_].ts)
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
 
@@ -220,34 +222,59 @@ class OSIRISApp(app_manager.RyuApp):
         except Exception:
             port_state = 0
 
-        port_object = self.find_port(switch_node.ports, port_index=str(port_number))
-
 
         if port_state == 0:
+            # if port state is 0, track down the deleted port object from current switch using the port_number.
+            port_object = self.find_port(switch_node.ports, port_index=str(port_number))
+            print(port_object)
             self.logger.info('PORT DELETE')
+
             # checks node for port on whatever port number EV said was deleted and removes it.
-            check = self.check_port_in_node_by_port_number(switch_node, str(port_number))
+            check = self.check_port_in_node_by_port_number(switch_node, str(port_object.index))
             print("Checking port result: %s" % check)
+
             if check is not None:
-                del self.switches_dict[port_object.id]
+                print("Port Object ID to DELETE: %s" % port_object.id)
+                print(self.switches_dict)
+
+                self.switches_dict[switch_node.id].ports.remove(port_object)
+
+                self.switches_dict[switch_node.id].update(force=True)
+
+
                 self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
             #if port_object is not None and port_object.id in self.switches_dict:
             #    del self.switches_dict[port_object.id]
             #    self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
         else:
             self.logger.info('PORT ADD or MODIFY')
+            port_object = self.find_port(self.domain_obj.ports, port.name.decode("utf-8"))
             if port_object is not None:
                 self.logger.info('PORT Already exists')
                 if port_object.id not in self.switches_dict:
-                    self.switches_dict[port_object.id] = port_object
+
+                    # NEED TO UPDATE VPORT NUMBER AND INDEX CURRENTLY TO REFLECT CONFIGURATION
+                    # TODO: get away from using Index for port number, remnant of previous spaghetti.
+                    port_object.address.vport_number = port_number
+                    port_object.index = str(port_number)
+                    port_object.vport_number = port_number
+                    print("ADD - ", port_object)
+                    # add found port to switch
+                    self.switches_dict[switch_node.id].ports.append(port_object)
+                    self.rt.flush()
+                    print("PORT SUCCESSFULLY ADDED TO SWITCH IN UNIS")
+
             else:
                 # PORT OBJECT NEEDS AN ID, DOESNT GET ADDED TO SWITCH WITHOUT ONE
                 port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
-                    {"address": port.hw_addr, "type": "mac"}})
+                    {"address": port.hw_addr, "type": "mac", "port_type":"vport", "vport_number": port.port_no}})
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
-                self.switches_dict[port_object.id] = port_object
+                self.switches_dict[switch_node.id].ports.append(port_object)
                 self.logger.info('PORT ADDED with %d port number and %s id', port_number, port_object.id)
+
+        # UPDATE UNIS
+        self.rt.flush()
 
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -414,6 +441,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("FOUND switch_node id: %s" % switch_node.id)
         self.switches_dict[switch_node.id] = switch_node
         self.logger.info("**** Adding the ports *****\n")
+
         # Ports
         for port in switch.ports:
 
@@ -444,8 +472,7 @@ class OSIRISApp(app_manager.RyuApp):
                     continue # move on to testing the next port
 
                 self.logger.info("!****NEW PORT***!")
-                port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
-                    {"address": port.hw_addr, "type": "mac"}})
+                port_object = self.create_vport_object(port)
 
 
                 self.logger.info("PORT NAME: %s | PORT NUMBER: %s | ADDRESS: %s \n"
@@ -470,8 +497,7 @@ class OSIRISApp(app_manager.RyuApp):
         print("SWITCH DICT: %s" % self.switches_dict)
         self.switches_dict[switch_node.id].ports = ports_list
 
-        # manually make changes due to defered update
-        switch_node.update(force=True)
+        #switch_node.update()
         self.rt.flush()
 
 
@@ -676,6 +702,14 @@ class OSIRISApp(app_manager.RyuApp):
             if port.index == port_number:
                 return port
         return None
+
+    def create_vport_object(self, port):
+        # Takes a port from RYU and converts it into a unisRT port object to push into the DB.
+
+        port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
+            {"address": port.hw_addr, "type": "mac"},"port_type":"vport", "vport_number": port.port_no})
+
+        return port_object
 
 class LLDPUtils:
 
