@@ -171,9 +171,10 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
             self.logger.info("----- id_ : %s -------" % id_)
+            print("PRINTING ALIVE DICT ITEM")
             print(self.alive_dict[id_].selfRef)
             self.alive_dict[id_].commit()
-            self.alive_dict[id_].poke()
+            #self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
