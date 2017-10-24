@@ -117,6 +117,10 @@ class OSIRISApp(app_manager.RyuApp):
         self.alive_dict = dict()
         # Persistent dict of Switch Nodes, Ports which are not reset every cycle, modified only on OF events
         self.switches_dict = dict()
+        # checks for topologies, if none, create a local topology. TODO: if domain_obj has changed, push a topology that references the new guy.
+        print("Making Topology...")
+        self.instantiate_local_topology()
+
 
 ####### UNIS Update functions #########
     def send_updates_decorator(func):
@@ -344,6 +348,27 @@ class OSIRISApp(app_manager.RyuApp):
             self.create_links(datapath, in_port, lldp_host_obj)
 
 ######### INIT helper functions ########
+    def instantiate_local_topology(self):
+        '''
+            Creates a new local topology object in unis that references the local domain only.
+            Only occurs if there is no topology inside of it.
+        '''
+        topo_obj = None
+        try:
+            topo_obj = self.rt.topologies[0]
+            self.logger.info("LOCAL TOPOLOGY FOUND")
+        except Exception:
+            # only if there is no topology, create a new one.
+            if topo_obj == None:
+                self.logger.info("NO LOCAL TOPOLOGY FOUND - CREATING NEW LOCAL TOPOLOGY")
+                new_topo = Topology({"name":"Local Topology"})
+                new_topo.domains.append(self.domain_obj)
+                self.rt.insert(new_topo, commit=True)
+                self.rt.flush()
+
+
+        return
+
     def create_domain(self):
         try:
             domain_obj = next(self.rt.domains.where(lambda x: getattr(x, "name", None) == self.domain_name))
