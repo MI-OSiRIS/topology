@@ -171,11 +171,14 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
             self.logger.info("----- id_ : %s -------" % id_)
-            print(self.alive_dict[id].selfRef)
+            print(self.alive_dict[id])
+            self.alive_dict[id].commit()
             self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
+        self.rt.flush()
+        print("FLUSHED")
 
 ########### OpenFlow event Handlers #############
     @set_ev_cls(ofp_event.EventOFPStateChange,
