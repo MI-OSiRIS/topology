@@ -170,15 +170,22 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("----- send_alive_dict_updates -------")
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
+
+            # Manually doing what poke does to see what is breaking here...
+            obj = self.alive_dict[id_]
+            obj.__dict__["ts"] = int(time.time() * 1000000)
+            payload = json.dumps({"ts": obj.ts})
+            obj._runtime._unis.put(obj.selfRef, payload)
             self.logger.info("----- id_ : %s -------" % id_)
+            
             print("PRINTING ALIVE DICT ITEM")
             print(self.alive_dict[id_].selfRef)
-            self.alive_dict[id_].commit()
+            #self.alive_dict[id_].commit()
             #self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
-        self.rt.flush()
+        #self.rt.flush()
         print("FLUSHED")
 
 ########### OpenFlow event Handlers #############
@@ -609,6 +616,8 @@ class OSIRISApp(app_manager.RyuApp):
 
         try:
             # FIND SWITCH NODE
+            # TODO: note to self, when you refacter this spaghetti, below is an example
+            # that can be compressed into a single, readable, line of UnisRT code.
             for node in self.rt.nodes:
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE NAME:"+node.name)
@@ -634,6 +643,8 @@ class OSIRISApp(app_manager.RyuApp):
 
                 print("SWITCH PORT: ", switch_port, " ||||||||||||||||||||||||||||||||||||||||||")
                 print("HOST PORT: ", host_port, " ||||||||||||||||||||||||||||||||||||||||||")
+
+                # screw it, it works, will nix the source of the issue when after the demo is working 100%
                 if switch_port.selfRef == "" or host_port.selfRef == "":
                     print("BAD PORT, SKIPPING LINK CREATION.")
                     return
