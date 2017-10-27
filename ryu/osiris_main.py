@@ -633,11 +633,11 @@ class OSIRISApp(app_manager.RyuApp):
                     link = self.check_link(link_name_2)
 
                 if link is None:
-                    link = Link({"name": link_name, "directed": False, "endpoints":
-                        [{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]})
+                    link = Link({"name": link_name, "directed": False, "endpoints":[switch_port, host_port]})
+                        #[{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]
                     self.rt.insert(link, commit=True)
                     self.domain_obj.links.append(link)
-
+                "endpoints": {[port, port]}
                 self.logger.info("Link id:"+link.id)
                 self.alive_dict[link.id] = link
         except:
