@@ -464,8 +464,6 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("*** ADDING TO DOMAIN***\n")
             self.switches_dict[switch_node.id] = switch_node
 
-            # if the node is brand new we need to flush
-            self.rt.flush()
             # get the node back out of UNIS after commit so it is treated as a UNIS object.
             switch_node = self.check_node(switch_name)
             self.domain_obj.nodes.append(switch_node)
