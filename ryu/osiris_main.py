@@ -637,7 +637,6 @@ class OSIRISApp(app_manager.RyuApp):
                         #[{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]
                     self.rt.insert(link, commit=True)
                     self.domain_obj.links.append(link)
-                "endpoints": {[port, port]}
                 self.logger.info("Link id:"+link.id)
                 self.alive_dict[link.id] = link
         except:
