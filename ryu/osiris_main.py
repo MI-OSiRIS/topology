@@ -177,15 +177,15 @@ class OSIRISApp(app_manager.RyuApp):
             payload = json.dumps({"ts": obj.ts})
             obj._runtime._unis.put(obj.selfRef, payload)
             self.logger.info("----- id_ : %s -------" % id_)
-            
+
             print("PRINTING ALIVE DICT ITEM")
             print(self.alive_dict[id_].selfRef)
-            #self.alive_dict[id_].commit()
+            self.alive_dict[id_].commit()
             #self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
-        #self.rt.flush()
+        self.rt.flush()
         print("FLUSHED")
 
 ########### OpenFlow event Handlers #############
