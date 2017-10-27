@@ -636,7 +636,7 @@ class OSIRISApp(app_manager.RyuApp):
                 print("HOST PORT: ", host_port, " ||||||||||||||||||||||||||||||||||||||||||")
                 if switch_port.selfRef == "" or host_port.selfRef == "":
                     print("BAD PORT, SKIPPING LINK CREATION.")
-                    continue
+                    return
 
                 if link is None:
                     link = Link({"name": link_name, "directed": False, "endpoints":[switch_port, host_port]})
