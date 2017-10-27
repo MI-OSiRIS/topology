@@ -632,6 +632,10 @@ class OSIRISApp(app_manager.RyuApp):
                 if link is None:
                     link = self.check_link(link_name_2)
 
+
+                print("HOST PORT: ", host_port, " ||||||||||||||||||||||||||||||||||||||||||")
+
+
                 if link is None:
                     link = Link({"name": link_name, "directed": False, "endpoints":[switch_port, host_port]})
                         #[{"rel": "full", "href": switch_port.selfRef}, {"rel": "full", "href": host_port.selfRef}]
