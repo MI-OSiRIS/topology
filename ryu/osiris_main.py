@@ -640,8 +640,8 @@ class OSIRISApp(app_manager.RyuApp):
                 if link is None:
                     link = self.check_link(link_name_2)
 
-                print("SWITCH PORT: ", switch_port, " ||||||||||||||||||||||||||||||||||||||||||")
-                print("HOST PORT: ", host_port, " ||||||||||||||||||||||||||||||||||||||||||")
+                print("SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
+                print("HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
 
                 # screw it, it works, will nix the source of the issue when after the demo is working 100%
                 if switch_port.selfRef == "" or host_port.selfRef == "":
@@ -681,9 +681,9 @@ class OSIRISApp(app_manager.RyuApp):
         return port_object
 
     def check_port(self, port_name, switch_node):
-        self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
         found = 0
         port_name = switch_node.name + ":" + port_name
+        self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
         for port in switch_node.ports:
             # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
             # as a byte string, which will always fail tests against port.name UTF-8 format.
