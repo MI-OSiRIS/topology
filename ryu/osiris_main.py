@@ -640,8 +640,8 @@ class OSIRISApp(app_manager.RyuApp):
                 if link is None:
                     link = self.check_link(link_name_2)
 
-                print("SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
-                print("HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
+                print("LINK SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
+                print("LINK HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
 
                 # screw it, it works, will nix the source of the issue when after the demo is working 100%
                 if switch_port.selfRef == "" or host_port.selfRef == "":
