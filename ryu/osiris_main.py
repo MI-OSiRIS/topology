@@ -682,6 +682,10 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port(self, port_name, switch_node):
         self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
+        
+        switch_name = switch_node.name
+        port_name = switch_name + ":" + port_name
+
         found = 0
         for port in switch_node.ports:
             # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
