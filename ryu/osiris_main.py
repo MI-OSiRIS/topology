@@ -176,7 +176,7 @@ class OSIRISApp(app_manager.RyuApp):
             #obj.__dict__["ts"] = int(time.time() * 1000000)
             #payload = json.dumps({"ts": obj.ts})
             #obj._runtime._unis.put(obj.selfRef, payload)
-            #self.logger.info("----- id_ : %s -------" % id_)
+            self.logger.info("----- id_ : %s -------" % id_)
 
             print("PRINTING ALIVE DICT ITEM")
             print(self.alive_dict[id_].selfRef)
@@ -377,7 +377,6 @@ class OSIRISApp(app_manager.RyuApp):
                 self.rt.insert(new_topo, commit=True)
                 self.rt.flush()
 
-
         return
 
     def create_domain(self):
@@ -510,7 +509,7 @@ class OSIRISApp(app_manager.RyuApp):
                     continue # move on to testing the next port
 
                 self.logger.info("!****NEW PORT***!")
-                port_object = self.create_vport_object(port)
+                port_object = self.create_vport_object(port, switch_name)
 
 
                 self.logger.info("PORT NAME: %s | PORT NUMBER: %s | ADDRESS: %s \n"
@@ -749,10 +748,10 @@ class OSIRISApp(app_manager.RyuApp):
                 return port
         return None
 
-    def create_vport_object(self, port):
+    def create_vport_object(self, port, switch_name):
         # Takes a port from RYU and converts it into a unisRT port object to push into the DB.
 
-        port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
+        port_object = Port({"name": switch_name + ":" + port.name.decode("utf-8"), "index": str(port.port_no), "address":
             {"address": port.hw_addr, "type": "mac"},"port_type":"vport", "vport_number": port.port_no})
 
         return port_object
