@@ -483,7 +483,7 @@ class OSIRISApp(app_manager.RyuApp):
         for port in switch.ports:
 
             # Search by Port Name - checks if port is already attached to our node.
-            port_object = self.check_port(port.name.decode('utf-8'), switch_node)
+            port_object = self.check_port(switch_name + ":" + port.name.decode('utf-8'), switch_node)
 
             if port_object is None:
 
@@ -682,10 +682,6 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port(self, port_name, switch_node):
         self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
-        
-        switch_name = switch_node.name
-        port_name = switch_name + ":" + port_name
-
         found = 0
         for port in switch_node.ports:
             # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
