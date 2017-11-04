@@ -623,10 +623,10 @@ class OSIRISApp(app_manager.RyuApp):
             for node in self.rt.nodes:
                 print("Testing: ", str(dpid))
                 if node.name == "switch:"+str(dpid):
-                    self.logger.info("SWITCH NODE NAME:"+node.name)
-                    self.logger.info("SWITCH NODE ID:" + node.id)
+                    self.logger.info("SWITCH NODE FOUND - NAME:"+node.name)
+                    self.logger.info("SWITCH NODE FOUND - ID:" + node.id)
                     for port in node.ports:
-                        if port.index == str(in_port):
+                        if port.vport_number == str(in_port):
                             switch_port = port
                             print("PORT MATCH: ", "switch:"+str(in_port))
                             break
