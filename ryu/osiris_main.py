@@ -637,7 +637,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             self.logger.info("======Creating a link =======")
             print("CONNECTING THESE PORTS")
-            print(host_port.name, switch_port.name)
+            print(host_port, switch_port)
             if switch_port is not None and host_port is not None:
                 link_name = switch_port.id + ":" + host_port.id
                 link_name_2 = host_port.id + ":" + switch_port.id
