@@ -355,7 +355,7 @@ class OSIRISApp(app_manager.RyuApp):
             lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
 
             # CREATE NODE and PORT
-            self.check_add_node_and_port(lldp_host_obj)
+            self.check_add_node_and_port(lldp_host_obj, in_port=in_port)
             # CREATE the LINK
             self.create_links(datapath, in_port, lldp_host_obj)
 
@@ -538,7 +538,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.rt.flush()
 
 
-    def check_add_node_and_port(self, lldp_host_obj):
+    def check_add_node_and_port(self, lldp_host_obj, in_port=None):
         """
             Creates UNIS Nodes and Ports from the LLDPHost information provided.
             Switch Nodes will be created by node_name as switch:<dp-id> and Host Nodes' name will be LLDP System Name.
@@ -578,8 +578,7 @@ class OSIRISApp(app_manager.RyuApp):
                     node.description = lldp_host_obj.system_description
                 self.rt.insert(node, commit=True)
                 self.domain_obj.nodes.append(node)
-            print(lldp_host_obj)
-            sys.exit(0)
+
             # Create Port
             port = self.check_port_in_node(node, node_name + ":" + port_name)
             if port is None:
@@ -588,7 +587,9 @@ class OSIRISApp(app_manager.RyuApp):
                 port = Port(
                        {"name": node_name + ":" + port_name, "address": {"type": port_address_type, "address": str(port_address)}})
                 port.properties.type = "vport"
-                port.properties.vport_number = port.port_no
+
+                # this is a step to make port matching somewhat reasonable instead of praying it works...
+                port.properties.vport_number = in_port # new optional parameter
 
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
