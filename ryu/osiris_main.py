@@ -587,7 +587,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.domain_obj.nodes.append(node)
 
             # check to see if port is already on switch
-            port = self.check_port_in_node(node, node_name + ":" + port_name)
+            port = self.check_port_in_node_by_port_number(node, in_port)
 
             if port is None:
                 # Create Port
@@ -655,7 +655,7 @@ class OSIRISApp(app_manager.RyuApp):
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             print("LLDP UTILS FOUND: ", node_name)
-            node = self.check_node(node_name)
+            node = self.check_node("switch:"+node_name)
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
 
@@ -781,7 +781,6 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port_in_node_by_port_number(self, node, port_number):
         for port in node.ports:
-            print(port)
             if port.properties.vport_number == port_number:
                 return port
         return None
