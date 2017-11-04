@@ -668,8 +668,8 @@ class OSIRISApp(app_manager.RyuApp):
                 print("LINK SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
                 print("LINK HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
 
-                print("SWITCH PORT SELF REF: ",switch_port.selfRef)
-                print("HOST PORT SELF REF: "host_port.selfRef)
+                print("SWITCH PORT SELF REF: ", switch_port.selfRef)
+                print("HOST PORT SELF REF: ", host_port.selfRef)
                 if switch_port.selfRef == "" or host_port.selfRef == "":
                     print("BAD PORT, SKIPPING LINK CREATION.")
                     return
