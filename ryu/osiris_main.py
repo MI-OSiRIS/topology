@@ -263,7 +263,7 @@ class OSIRISApp(app_manager.RyuApp):
             #    self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
         else:
             self.logger.info('PORT ADD or MODIFY')
-            port_object = self.find_port(self.domain_obj.ports, switch_name + ":"+ port.name.decode("utf-8"))
+            port_object = self.find_port(self.domain_obj.ports, port_name = switch_name + ":"+ port.name.decode("utf-8"))
             if port_object is not None:
                 self.logger.info('PORT Already exists')
                 if port_object.id not in self.switches_dict:
@@ -489,7 +489,7 @@ class OSIRISApp(app_manager.RyuApp):
             if port_object is None:
 
                 # see if the port is already in UNIS
-                port_object = self.find_port(self.domain_obj.ports, switch_name + ":" + port.name.decode("utf-8"), port.port_no)
+                port_object = self.find_port(self.domain_obj.ports, port_name = switch_name + ":" + port.name.decode("utf-8"), port_index = port.port_no)
 
                 # Check to see if port is already in UNIS and then add it to the Switch
                 # TODO: check by port MAC address instead of port.name to avoid complications in the future
@@ -645,10 +645,10 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
 
-            print("HOST PORT NAME - ", port_name)
-            print("SWITCH PORT NAME - ", switch_port.name)
-
             host_port = self.check_port(port_name, node)
+
+            print("HOST PORT NAME - ", host_port.name)
+            print("SWITCH PORT NAME - ", switch_port.name)
 
             self.logger.info("======Creating a link =======")
             print("CONNECTING THESE PORTS")
