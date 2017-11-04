@@ -649,9 +649,6 @@ class OSIRISApp(app_manager.RyuApp):
             print("LLDP UTILS FOUND: ", node_name)
             node = self.check_node("switch:" + node_name)
 
-            for port in node.ports:
-                print(port.selfRef)
-
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
 
             host_port = self.check_port(port_name, node)
