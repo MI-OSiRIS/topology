@@ -576,6 +576,8 @@ class OSIRISApp(app_manager.RyuApp):
 
             # Create Node
             if node is None:
+                print("NODE NOT FOUND....")
+                print("CREATING NEW NODE: ", node_name)
                 node = Node({"name": node_name})
                 if lldp_host_obj.system_description is not None:
                     self.logger.debug("Updating node description to %s" % lldp_host_obj.system_description)
