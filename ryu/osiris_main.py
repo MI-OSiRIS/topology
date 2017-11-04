@@ -663,12 +663,12 @@ class OSIRISApp(app_manager.RyuApp):
 
             if switch_port is not None and host_port is not None:
 
-            self.logger.info("======Creating a link =======")
-            print("CONNECTING THESE PORTS")
-            print(host_port, switch_port)
+                self.logger.info("======Creating a link =======")
+                print("CONNECTING THESE PORTS")
+                print(host_port, switch_port)
 
-            print("HOST PORT NAME - ", host_port.name)
-            print("SWITCH PORT NAME - ", switch_port.name)
+                print("HOST PORT NAME - ", host_port.name)
+                print("SWITCH PORT NAME - ", switch_port.name)
 
 
                 link_name = switch_port.id + ":" + host_port.id
