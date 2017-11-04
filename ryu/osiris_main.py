@@ -661,7 +661,7 @@ class OSIRISApp(app_manager.RyuApp):
             port_number = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             host_port = self.check_port_in_node_by_port_number(node, port_number)
             print(host_port)
-            print("FOUND HOST PORT - ", host_port.name) if host_port else break
+            print("FOUND HOST PORT - ", host_port.name) if host_port else return
 
             if switch_port is not None and host_port is not None:
 
