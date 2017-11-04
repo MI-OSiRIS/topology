@@ -619,12 +619,14 @@ class OSIRISApp(app_manager.RyuApp):
             # TODO: note to self, when you refacter this spaghetti, below is an example
             # that can be compressed into a single, readable, line of UnisRT code.
             print("LOOKING FOR SWITCH: ", "switch:"+str(dpid))
+            print("SEARCHING FOR PORT: ", str(in_port), " or ", "switch:"+str(in_port))
             for node in self.rt.nodes:
+                print("Testing: ", str(dpid))
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE NAME:"+node.name)
                     self.logger.info("SWITCH NODE ID:" + node.id)
                     for port in node.ports:
-                        if port.index == "switch:"+str(in_port):
+                        if port.index == str(in_port):
                             switch_port = port
                             print("PORT MATCH: ", "switch:"+str(in_port))
                             break
