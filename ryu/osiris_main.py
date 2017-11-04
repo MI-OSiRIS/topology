@@ -666,7 +666,7 @@ class OSIRISApp(app_manager.RyuApp):
                 print("HOST PORT FOUND - ", host_port)
             else:
                 print("Checking as port number: ", port_number)
-                host_port = self.check_port_in_node_by_port_number(node, port_name)
+                host_port = self.check_port_in_node_by_port_number(node, port_number)
 
 
             if switch_port is not None and host_port is not None:
