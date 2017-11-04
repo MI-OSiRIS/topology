@@ -761,7 +761,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         port_object = Port({"name": switch_name + ":" + port.name.decode("utf-8"), "index": str(port.port_no), "address":
             {"address": port.hw_addr, "type": "mac"},"port_type":"vport", "vport_number": port.port_no})
-
+        self.logger.info("CREATING OBJECT FOR NEW PORT: ", port.name, " on vport_number ", port_object.vport_number)
         return port_object
 
 class LLDPUtils:
