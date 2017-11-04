@@ -563,6 +563,7 @@ class OSIRISApp(app_manager.RyuApp):
             # Currently this assumes 1:1 between Nodes and Ports <- 9/8/17 This assumption is the source of all the big problems
             # in Ryu D:
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            print("CHECKING FOR PORT NAME (LLDPUTILS): ", port_name)
             if port_name is None or lldp_host_obj.port_id is None:
                 self.logger.error("LLDP Node's port cannot be added due to insufficient information.")
                 return
