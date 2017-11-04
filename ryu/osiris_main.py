@@ -628,24 +628,25 @@ class OSIRISApp(app_manager.RyuApp):
             host_port = None
 
 
-            # FIND SWITCH NODE
+            # FIND SWITCH NODE, FIND SWITCH PORT
             # TODO: note to self, when you refacter this spaghetti, below is an example
             # that can be compressed into a single, readable, line of UnisRT code.
             print("LOOKING FOR SWITCH: ", "switch:"+str(dpid))
             print("SEARCHING FOR PORT: ", str(in_port), " in ", "switch:"+str(dpid))
             for node in self.rt.nodes:
-                print("Testing: ", str(dpid))
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE FOUND - NAME:"+node.name)
                     self.logger.info("SWITCH NODE FOUND - ID:" + node.id)
                     for port in node.ports:
                         if port.properties.vport_number == in_port:
+                            switch_node = node
                             switch_port = port
                             print("PORT MATCH: ", port.name, " on port number - ", port.properties.vport_number)
                             break
 
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
+            print("LLDP UTILS FOUND: ", node_name)
             node = self.check_node(node_name)
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
 
@@ -667,7 +668,8 @@ class OSIRISApp(app_manager.RyuApp):
                 print("LINK SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
                 print("LINK HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
 
-                # screw it, it works, will nix the source of the issue when after the demo is working 100%
+                print("SWITCH PORT SELF REF: ",switch_port.selfRef)
+                print("HOST PORT SELF REF: "host_port.selfRef)
                 if switch_port.selfRef == "" or host_port.selfRef == "":
                     print("BAD PORT, SKIPPING LINK CREATION.")
                     return
