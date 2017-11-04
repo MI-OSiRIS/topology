@@ -595,7 +595,10 @@ class OSIRISApp(app_manager.RyuApp):
 
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
+
                 self.domain_obj.ports.append(port)
+
+                print(port.name + " added. ")
 
             self.alive_dict[node.id] = node
             self.alive_dict[port.id] = port
@@ -618,12 +621,13 @@ class OSIRISApp(app_manager.RyuApp):
             :param in_port: switch in_port details to find the switch port
             :param lldp_host_obj: LLDPHost Object to find the host node/port
         """
-
-        dpid = datapath.id
-        switch_port = None
-        host_port = None
-
         try:
+
+            dpid = datapath.id
+            switch_port = None
+            host_port = None
+
+
             # FIND SWITCH NODE
             # TODO: note to self, when you refacter this spaghetti, below is an example
             # that can be compressed into a single, readable, line of UnisRT code.
@@ -709,10 +713,12 @@ class OSIRISApp(app_manager.RyuApp):
             # as a byte string, which will always fail tests against port.name UTF-8 format.
             if port.name == port_name:
                 found += 1
+
         if found == 1:
             return port
         elif found > 1:
-            return self.logger.info("PORT %s ALREADY FOUND IN SWITCH", port.name)
+            self.logger.info("PORT %s ALREADY FOUND IN SWITCH", port.name)
+            return port
         else:
             self.logger.info("PORT %s NOT FOUND IN SWITCH %s" % (port_name, switch_node.name))
         return None
