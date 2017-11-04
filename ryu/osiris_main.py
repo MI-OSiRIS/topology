@@ -558,6 +558,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.error("LLDP Node cannot be added due to insufficient information.")
                 return
             node = self.check_node(node_name)
+            print("FOUND NODE: ", node.name) if node else print("NODE NOT FOUND....")
 
             # Port details
             # Currently this assumes 1:1 between Nodes and Ports <- 9/8/17 This assumption is the source of all the big problems
@@ -576,7 +577,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             # Create Node
             if node is None:
-                print("NODE NOT FOUND....")
+
                 print("CREATING NEW NODE: ", node_name)
                 node = Node({"name": node_name})
                 if lldp_host_obj.system_description is not None:
