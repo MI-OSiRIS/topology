@@ -543,7 +543,7 @@ class OSIRISApp(app_manager.RyuApp):
             Creates UNIS Nodes and Ports from the LLDPHost information provided.
             Switch Nodes will be created by node_name as switch:<dp-id> and Host Nodes' name will be LLDP System Name.
             As LLDP Advertisement can contain only one Port Information, this function assumes 1:1 relation
-            between Host and Ports.
+            between Host and Ports. <- this is the fatal flaw :(, trying to fix.
 
         :param lldp_host_obj:
         :return:
@@ -578,7 +578,8 @@ class OSIRISApp(app_manager.RyuApp):
                     node.description = lldp_host_obj.system_description
                 self.rt.insert(node, commit=True)
                 self.domain_obj.nodes.append(node)
-
+            print(lldp_host_obj)
+            sys.exit(0)
             # Create Port
             port = self.check_port_in_node(node, node_name + ":" + port_name)
             if port is None:
@@ -640,8 +641,10 @@ class OSIRISApp(app_manager.RyuApp):
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             node = self.check_node(node_name)
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+
             print("HOST PORT NAME - ", port_name)
-            print("HOST PORT NAME - ", switch_port.name)
+            print("SWITCH PORT NAME - ", switch_port.name)
+
             host_port = self.check_port(port_name, node)
 
             self.logger.info("======Creating a link =======")
