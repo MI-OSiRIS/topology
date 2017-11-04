@@ -631,7 +631,7 @@ class OSIRISApp(app_manager.RyuApp):
                     self.logger.info("SWITCH NODE FOUND - NAME:"+node.name)
                     self.logger.info("SWITCH NODE FOUND - ID:" + node.id)
                     for port in node.ports:
-                        if port.properties.vport_number == str(in_port):
+                        if port.properties.vport_number == in_port:
                             switch_port = port
                             print("PORT MATCH: ", "switch:"+str(in_port))
                             break
