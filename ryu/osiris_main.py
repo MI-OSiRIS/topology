@@ -655,10 +655,10 @@ class OSIRISApp(app_manager.RyuApp):
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             print("LLDP UTILS FOUND: ", node_name)
-            node = self.check_node("switch:"+node_name)
+            node = self.check_node(node_name)
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-
+            print(node)
             host_port = self.check_port(port_name, node)
 
             print("HOST PORT NAME - ", host_port.name)
