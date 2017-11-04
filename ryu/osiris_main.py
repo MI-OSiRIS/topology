@@ -659,13 +659,11 @@ class OSIRISApp(app_manager.RyuApp):
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-            print("SEARCHING " + node_name + " for port o" + port_name)
+            print("SEARCHING " + node_name + " for port " + port_name)
             host_port = self.check_port_in_node(node, port_name)
             print(host_port)
             if host_port:
                 print("HOST PORT FOUND - ", host_port)
-            else:
-                print("HOST PORT NOT FOUND")
                 return
 
             if switch_port is not None and host_port is not None:
@@ -847,8 +845,8 @@ class LLDPUtils:
         port_name = None
         if lldp_host_obj.port_description is not None:
             port_name = "port:" + lldp_host_obj.port_description
-        elif lldp_host_obj.port_id is not None:
-            port_name = (lldp_host_obj.port_id)
+        #elif lldp_host_obj.port_id is not None:
+        #    port_name = (lldp_host_obj.port_id)
         return str(port_name)
 
 
