@@ -658,13 +658,16 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            port_number = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)[5:]
             print("SEARCHING " + node_name + " for port " + port_name)
             host_port = self.check_port_in_node(node, port_name)
             print(host_port)
             if host_port:
                 print("HOST PORT FOUND - ", host_port)
-                return
+            else:
+                print("Checking as port number: ", port_number)
+                host_port = self.check_port_in_node_by_port_number(node, port_name)
+
 
             if switch_port is not None and host_port is not None:
 
@@ -843,10 +846,11 @@ class LLDPUtils:
         :return: port_name or None if can be determined
         """
         port_name = None
+        # the consequences of this simple function caused me physical pain. TODO: refactor entire program and rewrite this.
         if lldp_host_obj.port_description is not None:
             port_name = "port:" + lldp_host_obj.port_description
-        #elif lldp_host_obj.port_id is not None:
-        #    port_name = (lldp_host_obj.port_id)
+        elif lldp_host_obj.port_id is not None:
+            port_name = (lldp_host_obj.port_id)
         return str(port_name)
 
 
