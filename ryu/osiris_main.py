@@ -835,7 +835,7 @@ class LLDPUtils:
         """
         port_name = None
         if lldp_host_obj.port_description is not None:
-            port_name = lldp_host_obj.port_description
+            port_name = "port:" + lldp_host_obj.port_description
         elif lldp_host_obj.port_id is not None:
             port_name = (lldp_host_obj.port_id)
         return port_name
