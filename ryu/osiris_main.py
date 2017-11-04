@@ -660,7 +660,7 @@ class OSIRISApp(app_manager.RyuApp):
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             print("SEARCHING " + node_name + " for port o" + port_name)
-            host_port = self.check_port_in_node(port_name, node)
+            host_port = self.check_port_in_node(node, port_name)
             print(host_port)
             if host_port:
                 print("HOST PORT FOUND - ", host_port)
