@@ -603,9 +603,9 @@ class OSIRISApp(app_manager.RyuApp):
 
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
-
+                node.update(force=True)
                 self.domain_obj.ports.append(port)
-
+                self.rt.flush()
                 print(port.name + " added. ")
 
             self.alive_dict[node.id] = node
@@ -837,7 +837,7 @@ class LLDPUtils:
         if lldp_host_obj.port_description is not None:
             port_name = lldp_host_obj.port_description
         elif lldp_host_obj.port_id is not None:
-            port_name = "port:"+str(lldp_host_obj.port_id)
+            port_name = (lldp_host_obj.port_id)
         return port_name
 
 
