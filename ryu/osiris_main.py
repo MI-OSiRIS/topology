@@ -658,15 +658,18 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-            print(node)
+
             host_port = self.check_port(port_name, node)
 
-            print("HOST PORT NAME - ", host_port.name)
-            print("SWITCH PORT NAME - ", switch_port.name)
+
 
             self.logger.info("======Creating a link =======")
             print("CONNECTING THESE PORTS")
             print(host_port, switch_port)
+
+            print("HOST PORT NAME - ", host_port.name)
+            print("SWITCH PORT NAME - ", switch_port.name)
+
             if switch_port is not None and host_port is not None:
                 link_name = switch_port.id + ":" + host_port.id
                 link_name_2 = host_port.id + ":" + switch_port.id
