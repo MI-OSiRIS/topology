@@ -658,13 +658,14 @@ class OSIRISApp(app_manager.RyuApp):
             node = self.check_node(node_name)
 
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-            port_number = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
-            print("SEARCHING " + node_name + " for port on port number " + port_number)
-            host_port = self.check_port_in_node_by_port_number(node, port_number)
+            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            print("SEARCHING " + node_name + " for port o" + port_name)
+            host_port = self.check_port_in_node(port_name, node)
             print(host_port)
             if host_port:
                 print("HOST PORT FOUND - ", host_port)
             else:
+                print("HOST PORT NOT FOUND")
                 return
 
             if switch_port is not None and host_port is not None:
@@ -792,7 +793,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port_in_node_by_port_number(self, node, port_number):
         for port in node.ports:
-            if port.properties.vport_number == port_number:
+            if port.properties.vport_number == int(port_number):
                 return port
         return None
 
