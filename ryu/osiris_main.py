@@ -661,7 +661,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             host_port = self.check_port(port_name, node)
 
-
+            if switch_port is not None and host_port is not None:
 
             self.logger.info("======Creating a link =======")
             print("CONNECTING THESE PORTS")
@@ -670,7 +670,7 @@ class OSIRISApp(app_manager.RyuApp):
             print("HOST PORT NAME - ", host_port.name)
             print("SWITCH PORT NAME - ", switch_port.name)
 
-            if switch_port is not None and host_port is not None:
+
                 link_name = switch_port.id + ":" + host_port.id
                 link_name_2 = host_port.id + ":" + switch_port.id
                 link = self.check_link(link_name)
@@ -693,6 +693,8 @@ class OSIRISApp(app_manager.RyuApp):
                     self.domain_obj.links.append(link)
                 self.logger.info("Link id:"+link.id)
                 self.alive_dict[link.id] = link
+            else:
+                print("BAD PORT, SKIPPING LINK CREATION.")
         except:
             self.logger.info("Exception in create_links ---------")
             self.logger.info(lldp_host_obj.__dict__)
