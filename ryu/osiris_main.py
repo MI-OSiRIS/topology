@@ -281,8 +281,9 @@ class OSIRISApp(app_manager.RyuApp):
 
             else:
                 # PORT OBJECT NEEDS AN ID, DOESNT GET ADDED TO SWITCH WITHOUT ONE
-                port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
-                    {"address": port.hw_addr, "type": "mac", "port_type":"vport", "vport_number": port.port_no}})
+                #port_object = Port({"name": port.name.decode("utf-8"), "index": str(port.port_no), "address":
+                #    {"address": port.hw_addr, "type": "mac", "port_type":"vport", "vport_number": port.port_no}})
+                port_object = self.create_vport_object(port, switch_name)
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
                 self.switches_dict[switch_node.id].ports.append(port_object)
