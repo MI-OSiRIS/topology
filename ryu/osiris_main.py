@@ -633,13 +633,15 @@ class OSIRISApp(app_manager.RyuApp):
                     for port in node.ports:
                         if port.properties.vport_number == in_port:
                             switch_port = port
-                            print("PORT MATCH: ", "switch:"+str(in_port))
+                            print("PORT MATCH: ", port.name, " on port number - ", port.properties.vport_number)
                             break
 
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             node = self.check_node(node_name)
             port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            print("HOST PORT NAME - ", port_name)
+            print("HOST PORT NAME - ", switch_port.name)
             host_port = self.check_port(port_name, node)
 
             self.logger.info("======Creating a link =======")
