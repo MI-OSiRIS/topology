@@ -762,9 +762,9 @@ class OSIRISApp(app_manager.RyuApp):
 
         port_object = Port({"name": switch_name + ":" + port.name.decode("utf-8"), "index": str(port.port_no), "address":
             {"address": port.hw_addr, "type": "mac"})
-        port.type = vport
-        port.vport_number = port.port_no.decode("utf-8")
-        self.logger.info("CREATING OBJECT FOR NEW PORT: ", port_object.name, " on vport_number ", port_object.vport_number.decode("utf-8"))
+        port_object.type = vport
+        port_object.vport_number = port.port_no.decode("utf-8")
+        self.logger.info("CREATING OBJECT FOR NEW PORT: ", port_object.name, " on vport_number ", port_object.vport_number)
         # ,"port_type":"vport", "vport_number": port.port_no.decode("utf-8")}
 
         return port_object
