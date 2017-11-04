@@ -625,7 +625,7 @@ class OSIRISApp(app_manager.RyuApp):
                     for port in node.ports:
                         if port.index == "switch:"+str(in_port):
                             switch_port = port
-                            print("PORT MATCH ": "switch:"+str(in_port))
+                            print("PORT MATCH: ", "switch:"+str(in_port))
                             break
 
             # FIND THE OTHER NODE/PORT
