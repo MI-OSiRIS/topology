@@ -490,7 +490,6 @@ class OSIRISApp(app_manager.RyuApp):
 
                 # see if the port is already in UNIS
                 port_object = self.find_port(self.domain_obj.ports, switch_name + ":" + port.name.decode("utf-8"), port.port_no)
-                print("CHECKING PORT NAME: ", port_object.name)
 
                 # Check to see if port is already in UNIS and then add it to the Switch
                 # TODO: check by port MAC address instead of port.name to avoid complications in the future
@@ -499,6 +498,8 @@ class OSIRISApp(app_manager.RyuApp):
                     # Add port to switch now, if this IF statement is validated it means the port
                     # was incorrectly not added to the switch previously and is already in UNIS
                     print("PORT NUMBER: %s" % port.port_no)
+
+                    print("PORT NAME: ", port_object.name)
 
                     # updates unis port object with the correct port number. Unfortunately the schema is a string..
                     port_object.index = str(port.port_no)
