@@ -774,7 +774,7 @@ class OSIRISApp(app_manager.RyuApp):
             {"address": port.hw_addr, "type": "mac"}})
         port_object.properties.type = "vport"
         port_object.properties.vport_number = port.port_no
-        self.logger.info("CREATING OBJECT FOR NEW PORT: ", port_object.name)
+        print("CREATING OBJECT FOR NEW PORT: ", port_object.name)
         # ,"port_type":"vport", "vport_number": port.port_no.decode("utf-8")}
 
         return port_object
