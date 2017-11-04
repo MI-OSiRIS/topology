@@ -245,7 +245,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info('PORT DELETE')
 
             # checks node for port on whatever port number EV said was deleted and removes it.
-            check = self.check_port_in_node_by_port_number(switch_node, str(port_object.index))
+            check = self.check_port_in_node_by_port_number(switch_node, str(port_object.properties.vport_number))
             print("Checking port result: %s" % check)
 
             if check is not None:
@@ -485,7 +485,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             # Search by Port Name - checks if port is already attached to our node.
             port_object = self.check_port(switch_name + ":" + port.name.decode('utf-8'), switch_node)
-
+            print("CHECING PORT NAME: ", port_object.name)
             if port_object is None:
 
                 # see if the port is already in UNIS
@@ -763,7 +763,7 @@ class OSIRISApp(app_manager.RyuApp):
     def check_port_in_node_by_port_number(self, node, port_number):
         for port in node.ports:
             print(port)
-            if port.index == port_number:
+            if port.properties.vport_number == port_number:
                 return port
         return None
 
