@@ -580,11 +580,15 @@ class OSIRISApp(app_manager.RyuApp):
                 self.domain_obj.nodes.append(node)
 
             # Create Port
-            port = self.check_port_in_node(node, port_name)
+            port = self.check_port_in_node(node, node_name + ":" + port_name)
             if port is None:
                 print("Creating Port: ", node_name + ":" +port_name )
+
                 port = Port(
-                        {"name": node_name + ":" +port_name, "address": {"type": port_address_type, "address": str(port_address)}})
+                       {"name": node_name + ":" + port_name, "address": {"type": port_address_type, "address": str(port_address)}})
+                port.properties.type = "vport"
+                port.properties.vport_number = port.port_no
+
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
                 self.domain_obj.ports.append(port)
@@ -635,7 +639,7 @@ class OSIRISApp(app_manager.RyuApp):
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             node = self.check_node(node_name)
-            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             host_port = self.check_port(port_name, node)
 
             self.logger.info("======Creating a link =======")
@@ -746,7 +750,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port_in_node(self, node, port_name):
         for port in node.ports:
-            if port.name == port_name:
+            if port.name == (node.name + ":" + port_name):
                 return port
         return None
 
