@@ -761,7 +761,7 @@ class OSIRISApp(app_manager.RyuApp):
         # Takes a port from RYU and converts it into a unisRT port object to push into the DB.
 
         port_object = Port({"name": switch_name + ":" + port.name.decode("utf-8"), "index": str(port.port_no), "address":
-            {"address": port.hw_addr, "type": "mac"})
+            {"address": port.hw_addr, "type": "mac"}})
         port_object.properties.type = vport
         port_object.properties.vport_number = port.port_no.decode("utf-8")
         self.logger.info("CREATING OBJECT FOR NEW PORT: ", port_object.name, " on vport_number ", port_object.vport_number)
