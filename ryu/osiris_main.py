@@ -592,7 +592,7 @@ class OSIRISApp(app_manager.RyuApp):
             if port is None:
                 # Create Port
 
-                print("Creating Port: ", node_name + ":" +port_name )
+                print("Creating Port: ", node_name + ":" + port_name )
 
                 port = Port(
                        {"name": node_name + ":" + port_name, "address": {"type": port_address_type, "address": str(port_address)}})
@@ -640,7 +640,7 @@ class OSIRISApp(app_manager.RyuApp):
             # TODO: note to self, when you refacter this spaghetti, below is an example
             # that can be compressed into a single, readable, line of UnisRT code.
             print("LOOKING FOR SWITCH: ", "switch:"+str(dpid))
-            print("SEARCHING FOR PORT: ", str(in_port), " in ", "switch:"+str(dpid))
+            print("SEARCHING FOR PORT NUM: ", str(in_port), " in ", "switch:"+str(dpid))
             for node in self.rt.nodes:
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE FOUND - NAME:"+node.name)
@@ -657,7 +657,7 @@ class OSIRISApp(app_manager.RyuApp):
             print("LLDP UTILS FOUND: ", node_name)
             node = self.check_node(node_name)
 
-            port_name = node_name + ":" + LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
+            port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             port_number = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             print("SEARCHING " + node_name + " for port " + port_name)
             host_port = self.check_port_in_node(node, port_name)
