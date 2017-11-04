@@ -581,8 +581,9 @@ class OSIRISApp(app_manager.RyuApp):
             # Create Port
             port = self.check_port_in_node(node, port_name)
             if port is None:
+                print("Creating Port: ", node_name + ":" +port_name )
                 port = Port(
-                        {"name": port_name, "address": {"type": port_address_type, "address": str(port_address)}})
+                        {"name": node_name + ":" +port_name, "address": {"type": port_address_type, "address": str(port_address)}})
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
                 self.domain_obj.ports.append(port)
