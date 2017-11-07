@@ -394,7 +394,11 @@ class OSIRISApp(app_manager.RyuApp):
         '''
         host_rt = Runtime(self.CONF.osiris.unis_host)
         topology = host_rt.topologies
-        print(topology)
+
+        for topo in topology:
+            print(topo)
+
+        sys.exit(0)
 
         return
 
