@@ -757,7 +757,21 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.error(''.join(line for line in lines))
 
 ######## Main Event processing helper functions ##########
-               
+    def merge_port_diff(self, port_object, port):
+        """
+            Merges any changes in the port details with the already existing port object
+        :param port_object: Already Existing Port object
+        :param port: port entry from the OF message
+        :return: port_object: Merged port object
+        """
+        print(port_object.name, port.name.decode('utf-8'))
+        if port_object.name != port.name.decode("utf-8"):
+            self.logger.info("*** ERROR: Port name is different***")
+            return None
+        if port_object.index != str(port.port_no):
+    port_object.index = str(port.port_no)
+     
+           
     def merge_port_diff(self, port_object, port, switch_name):
         """
             Merges any changes in the port details with the already existing port object
