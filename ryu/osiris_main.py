@@ -99,9 +99,11 @@ class OSIRISApp(app_manager.RyuApp):
             cfg.StrOpt('unis_domain', default=''),
             cfg.StrOpt('unis_server', default='http://localhost:8888'),
             cfg.StrOpt('unis_update_interval', default='5'),
+            cfg.StrOpt('unis_host', default='http://iu-ps01.osris.org:8888')
         ], group="osiris")
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
+        self.unis_host = self.CONF.osiris.unis_host
         self.interval_secs = int(self.CONF.osiris.unis_update_interval)
         self.logger.info("----- UPDATE INTERVAL IS %d -------" % self.interval_secs)
         self.logger.info("Connecting to UNIS Server at "+unis_server)
@@ -120,6 +122,9 @@ class OSIRISApp(app_manager.RyuApp):
         # checks for topologies, if none, create a local topology. TODO: if domain_obj has changed, push a topology that references the new guy.
         print("Making Topology...")
         self.instantiate_local_topology()
+        print("Attemping to Update Host Topology")
+        self.check_update_host_topology()
+        sys.exit(0)
 
 
 ####### UNIS Update functions #########
@@ -377,6 +382,19 @@ class OSIRISApp(app_manager.RyuApp):
                 new_topo.domains.append(self.domain_obj)
                 self.rt.insert(new_topo, commit=True)
                 self.rt.flush()
+
+        return
+
+    def check_update_host_topology(self):
+        '''
+            Checks the currect osiris.json esque topology on the host node, and update the
+            associated hrefs to match the current switch's domain href.
+
+            Also updates the link in the host that connects the topology to ChicPOP
+        '''
+        host_rt = Runtime(self.CONF.osiris.unis_host)
+        topology = host_rt.topologies
+        print(topology)
 
         return
 
@@ -987,9 +1005,9 @@ class LLDPHost:
         self.logger.info("==== Printing the LLDP Host details ====")
         self.logger.info(self.chassis_id)
         self.logger.info(self.port_id)
-        self.logger.info(self.port_description)
-        self.logger.info(self.system_name)
-        self.logger.info(self.system_description)
-        self.logger.info(self.management_addresses)
+        #self.logger.info(self.port_description)
+        #self.logger.info(self.system_name)
+        #self.logger.info(self.system_description)
+        #self.logger.info(self.management_addresses)
 
 app_manager.require_app('ryu.app.ofctl_rest')
