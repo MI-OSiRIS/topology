@@ -392,7 +392,7 @@ class OSIRISApp(app_manager.RyuApp):
 
             Also updates the link in the host that connects the topology to ChicPOP
         '''
-        host_rt = Runtime(self.CONF.osiris.unis_host)
+        host_rt = Runtime(self.CONF.osiris.unis_host)      # we are going to update the 'main' topology based on the what is in the configuration file
         topology = host_rt.topologies[0]                   # the first topology instance is the most recent and AFAIK the one we want
         topology_dict = topology.to_JSON()                 # this is how we get around the Runtime essentially sandboxing us, treat JSON as a dict.
         href_list = []                                     # create something to store the hrefs we are about to gather
@@ -400,11 +400,13 @@ class OSIRISApp(app_manager.RyuApp):
                 domain_href = topology_dict['domains'][i]['href']
                 print("Finding HREF", domain_href)
                 href_list.append(domain_href)
-        
+
         match = ''                                            # instantiate something to store the href if we hit a match
-        for index, href in enumerate(href_list):                                # time to sift through the different unis instances 
-                unis_href = href.split('8888', 1)[0] + '8888' # too lazy to regex here, TODO?
+        for index, href in enumerate(href_list):                                # time to sift through the different unis instances
+
+                unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO?
                 current_rt = Runtime(unis_href)
+
                 try:
                         most_recent_domain = current_rt.domains[0]
                         if self.domain_obj.name == most_recent_domain.name:  # KEY: production switches now need to properly set the unis_domain setting in the config file from now on
@@ -412,15 +414,42 @@ class OSIRISApp(app_manager.RyuApp):
                                 match = unis_href
                                 topology.domains[index] = most_recent_domain
                                 #host_rt.flush() # not sure if this is necessary, will experiment
-                                print("\nDomain: ", self.domain_obj.name, ", updated succsessfully at ", topology.selfRef, " with href - ", href, "\n")
+                                print("\nDomain: ", self.domain_obj.name, ", updated domain object successfully at ", topology.selfRef, " with href - ", href, "\n")
+
+                                try: # update the link as well
+
+                                    link_name = "link-" + self.domain_obj.name + "-CHIC" # string - 'link-UM-CHIC'
+                                    link = topology.links.where({'name':link_name})
+
+                                    if link:
+                                        link.endpoints[0] = most_recent_domain
+                                        print('Verified the link to this domain.\n')
+
+                                    else: # no link was found, add it to the topology
+                                        new_link = Link({"name": link_name,
+                                                        "directed": False,
+                                                        "endpoints":
+                                                            [most_recent_domain,
+                                                            {"href" : "$.domains[?(@.name==\"CHIC PoP\")]", "rel": "full"}]})
+                                        topology.links.append(new_link, commit='True')
+                                        print("Generated new link to the current domain.\n")
+
+                                except Exception:
+                                    logging.exception('Could not update interdomain link.')
+
+
                 except Exception:
                         logging.exception('Trouble Updating Unis Host Topology... Continuing')
-                #current_rt.shutdown()
-        if match == '':                                              # occurs if no match was found, if so then add it to the topology, not sure if it works correctly in this object though..
+
+                current_rt.shutdown()
+
+        if match == '':                                              # TODO: occurs if no match was found, if so then add it to the topology, not sure if would work correctly in this object though..
                 print('No match found for: ', self.domain_obj.name, ', adding domain to host site, ', topology.selfRef)
                 # not sure how to go about this since a we are not pushing the remote object to the host but instead 'updating' it.
 
-        #host_rt.shutdown()  # close connections to other Runtimes
+
+        host_rt.shutdown()  # close connections to other Runtimes
+
         return
 
     def create_domain(self):
@@ -757,7 +786,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.error(''.join(line for line in lines))
 
 ######## Main Event processing helper functions ##########
-               
+
     def merge_port_diff(self, port_object, port, switch_name):
         """
             Merges any changes in the port details with the already existing port object
