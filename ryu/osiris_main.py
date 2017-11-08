@@ -419,7 +419,7 @@ class OSIRISApp(app_manager.RyuApp):
                                 try: # update the link as well
 
                                     link_name = "link-" + self.domain_obj.name + "-CHIC" # string - 'link-UM-CHIC'
-                                    link = topology.links.where({'name':link_name})
+                                    link = map(lambda link: link.name == link_name, topology.links)
 
                                     if link:
                                         link.endpoints[0] = most_recent_domain
