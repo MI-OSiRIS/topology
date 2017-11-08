@@ -20,6 +20,7 @@ import calendar
 import logging
 import pprint
 
+from itertools import compress
 from ryu.base import app_manager
 from ryu.controller.handler import CONFIG_DISPATCHER, \
     MAIN_DISPATCHER, DEAD_DISPATCHER
@@ -124,6 +125,7 @@ class OSIRISApp(app_manager.RyuApp):
         self.instantiate_local_topology()
         print("Attemping to Update Host Topology")
         self.check_update_host_topology()
+        print('UPDATED HOST TOPOLOGY')
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
         self.create_domain()
 
@@ -402,11 +404,12 @@ class OSIRISApp(app_manager.RyuApp):
                 href_list.append(domain_href)
 
         match = ''                                            # instantiate something to store the href if we hit a match
+        
         for index, href in enumerate(href_list):                                # time to sift through the different unis instances
-
+                
                 unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO?
                 current_rt = Runtime(unis_href)
-
+                print("TESTING OUT ", unis_href)
                 try:
                         most_recent_domain = current_rt.domains[0]
                         if self.domain_obj.name == most_recent_domain.name:  # KEY: production switches now need to properly set the unis_domain setting in the config file from now on
@@ -415,17 +418,24 @@ class OSIRISApp(app_manager.RyuApp):
                                 topology.domains[index] = most_recent_domain
                                 #host_rt.flush() # not sure if this is necessary, will experiment
                                 print("\nDomain: ", self.domain_obj.name, ", updated domain object successfully at ", topology.selfRef, " with href - ", href, "\n")
-
+                                
+                                link = ''
+                                
                                 try: # update the link as well
 
                                     link_name = "link-" + self.domain_obj.name + "-CHIC" # string - 'link-UM-CHIC'
-                                    link = map(lambda link: link.name == link_name, topology.links)
-
-                                    if link:
-                                        link.endpoints[0] = most_recent_domain
-                                        print('Verified the link to this domain.\n')
-
-                                    else: # no link was found, add it to the topology
+                                    print("TESTING AGAINST LINK NAME: ", link_name)
+                                    link_map = list(map(lambda link: link.name == link_name, topology.links))
+                                    for key, l in enumerate(topology.links):
+                                            if link_map[key] == True:
+                                                    link = l
+                                                    link.endpoints[0] = most_recent_domain
+                                                    print('Verified the link to this domain.\n')
+                                                    print(link_map[key])                                                                           
+                                                    return 
+                                         
+                                    if link == '': # no link was found, add it to the topology
+                                        print("No link found for this domain, creating and adding it to host topology...")
                                         new_link = Link({"name": link_name,
                                                         "directed": False,
                                                         "endpoints":
@@ -435,6 +445,7 @@ class OSIRISApp(app_manager.RyuApp):
                                         print("Generated new link to the current domain.\n")
 
                                 except Exception:
+                                    print("EXCEPTION")
                                     logging.exception('Could not update interdomain link.')
 
 
@@ -449,7 +460,7 @@ class OSIRISApp(app_manager.RyuApp):
 
 
         host_rt.shutdown()  # close connections to other Runtimes
-
+        print("Finishing Up startup")
         return
 
     def create_domain(self):
