@@ -411,7 +411,9 @@ class OSIRISApp(app_manager.RyuApp):
                 current_rt = Runtime(unis_href)
                 print("TESTING OUT ", unis_href)
                 try:
-                        most_recent_domain = current_rt.domains[0]
+                        most_recent_domain = list(current_rt.domains.where({"name":self.domain_obj.name}))[0]
+                        print("Comparing ",self.domain_obj.name, most_recent_domain.name)
+                     
                         if self.domain_obj.name == most_recent_domain.name:  # KEY: production switches now need to properly set the unis_domain setting in the config file from now on
                                 print("Found current matching domain in UNIS Host...")
                                 match = unis_href
