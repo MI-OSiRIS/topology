@@ -165,6 +165,8 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("----- send_switches_updates -------")
         for id_ in self.switches_dict:
             print(self.switches_dict[id_].ts)
+            if "Open" in self.switches_dict[id_].description:
+                continue # fixes the bug where OpenVSwitch Schema nodes were turning into regular nodes ¯\_(ツ)_/¯ will return to this eventually 
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
 
@@ -636,6 +638,7 @@ class OSIRISApp(app_manager.RyuApp):
         :return:
         """
         self.logger.info("**check_add_node_and_port***")
+        print("HOST DESCRIPTION: ", lldp_host_obj.system_description)
         try:
             # Node Details
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
@@ -643,6 +646,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.error("LLDP Node cannot be added due to insufficient information.")
                 return
             node = self.check_node(node_name)
+            print("SEARCHING FOR NODE NAME: ", node_name," from LLDP Host")
             print("FOUND NODE: ", node.name) if node else print("NODE NOT FOUND....")
 
             # Port details
@@ -664,12 +668,14 @@ class OSIRISApp(app_manager.RyuApp):
             if node is None:
 
                 print("CREATING NEW NODE: ", node_name)
-                node = Node({"name": node_name})
-                if lldp_host_obj.system_description is not None:
+                is_of_instance = "Open" in lldp_host_obj.system_description          # had to be done
+                              
+                if is_of_instance is not True and lldp_host_obj.system_description is not None:
+                    node = Node({"name": node_name})    
                     self.logger.debug("Updating node description to %s" % lldp_host_obj.system_description)
                     node.description = lldp_host_obj.system_description
-                self.rt.insert(node, commit=True)
-                self.domain_obj.nodes.append(node)
+                    self.rt.insert(node, commit=True)
+                    self.domain_obj.nodes.append(node)
 
             # check to see if port is already on switch
             port = self.check_port_in_node_by_port_number(node, in_port)
