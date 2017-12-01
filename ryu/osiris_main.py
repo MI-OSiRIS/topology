@@ -267,7 +267,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info('PORT DELETE')
 
             # checks node for port on whatever port number EV said was deleted and removes it.
-            check = self.check_port_in_node_by_port_number(switch_node, str(port_object.properties.vport_number))
+            check = self.check_port_in_node(node, switch_name + ':' + port_name)
             print("Checking port result: %s" % check)
 
             if check is not None:
@@ -775,7 +775,7 @@ class OSIRISApp(app_manager.RyuApp):
             else:
                 print("Checking as port number: ", port_number)
                 try:
-                    host_port = self.check_port_in_node_by_port_number(node, port_number)
+                    host_port = self.check_port_in_node(node, port_name)
                 except Exception:
                     return
 
@@ -867,6 +867,8 @@ class OSIRISApp(app_manager.RyuApp):
         :return: Port Object
         """
         for port in ports:
+            if port_index is not None and port_index == port.properties.vport_number:
+                return port
             if port_name is not None and port_name == port.name:
                 return port
 
