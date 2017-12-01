@@ -27,6 +27,7 @@ from ryu.controller.handler import CONFIG_DISPATCHER, \
 from ryu.controller import ofp_event
 from ryu.controller.handler import set_ev_cls
 from ryu.topology import event, switches
+from ryu.topology.api import get_switch, get_link
 from ryu.topology.switches import LLDPPacket
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
@@ -39,6 +40,7 @@ from unis.models import *
 from unis.runtime import Runtime
 from unis import logging as ulog
 from unis.models.models import UnisList
+from lldp_manager import LLDPHost, LLDPUtils
 
 # turn down various loggers
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -110,10 +112,10 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
-        #UnisRT debug lines
+        ## UnisRT debug lines
         #unis.logging.setLevel(unis.logging.DEBUG)
         #unis.logging.doTrace(True)
-        ###### end debug lines
+        ##end debug lines
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
         # Transient dict of LLDP-discovered Nodes, Ports and Links which are reset every cycle
@@ -124,7 +126,7 @@ class OSIRISApp(app_manager.RyuApp):
         print("Making Topology...")
         self.instantiate_local_topology()
         print("Attemping to Update Host Topology")
-        self.check_update_host_topology()
+        #self.check_update_host_topology()
         print('UPDATED HOST TOPOLOGY')
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
         self.create_domain()
@@ -166,7 +168,7 @@ class OSIRISApp(app_manager.RyuApp):
         for id_ in self.switches_dict:
             print(self.switches_dict[id_].ts)
             if "Open" in self.switches_dict[id_].description:
-                continue # fixes the bug where OpenVSwitch Schema nodes were turning into regular nodes ¯\_(ツ)_/¯ will return to this eventually 
+                continue # fixes the bug where OpenVSwitch Schema nodes were turning into regular nodes ¯\_(ツ)_/¯ will return to this eventually
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
 
@@ -212,6 +214,17 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.debug('unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
                 self.deregister_switch(datapath)
+
+    @set_ev_cls(event.EventSwitchEnter)
+    def get_switch_topo(self, ev):
+        print("Switch Enter Event: ", ev.switch)
+        switch_list = get_switch(self, ev.switch.dp.id)
+        print("SWITCH: ", switch_list)
+        switches=[switch.dp.id for switch in switch_list]
+        links_list = get_link(self, None)
+        links=[(link.src.dpid,link.dst.dpid,{'src':link.src.to_dict(), 'port_dst':link.dst.to_dict()}) for link in links_list]
+        print("DISCOVERY")
+        print(switches, links)
 
     @set_ev_cls(event.EventSwitchEnter)
     @send_updates_decorator
@@ -296,7 +309,7 @@ class OSIRISApp(app_manager.RyuApp):
                 self.rt.insert(port_object, commit=True)
                 self.domain_obj.ports.append(port_object)
                 self.switches_dict[switch_node.id].ports.append(port_object)
-                self.logger.info('PORT ADDED with %d port number and %s id', port_number, port_object.id)
+                self.logger.info('NEW PORT ADDED')
 
         # UPDATE UNIS
         self.rt.flush()
@@ -341,6 +354,7 @@ class OSIRISApp(app_manager.RyuApp):
     @send_updates_decorator
     def _packet_in_handler(self, ev):
         msg = ev.msg
+        print("Packet in Hangler: ", msg)
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -357,7 +371,7 @@ class OSIRISApp(app_manager.RyuApp):
         src = eth_pkt.src
 
         # get the received port number from packet_in message.
-        in_port = msg.match['in_port']
+        in_port = msg.in_port
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
@@ -406,25 +420,25 @@ class OSIRISApp(app_manager.RyuApp):
                 href_list.append(domain_href)
 
         match = ''                                            # instantiate something to store the href if we hit a match
-        
+
         for index, href in enumerate(href_list):                                # time to sift through the different unis instances
-                
+
                 unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO?
                 current_rt = Runtime(unis_href)
                 print("TESTING OUT ", unis_href)
                 try:
                         most_recent_domain = list(current_rt.domains.where({"name":self.domain_obj.name}))[0]
                         print("Comparing ",self.domain_obj.name, most_recent_domain.name)
-                     
+
                         if self.domain_obj.name == most_recent_domain.name:  # KEY: production switches now need to properly set the unis_domain setting in the config file from now on
                                 print("Found current matching domain in UNIS Host...")
                                 match = unis_href
                                 topology.domains[index] = most_recent_domain
                                 #host_rt.flush() # not sure if this is necessary, will experiment
                                 print("\nDomain: ", self.domain_obj.name, ", updated domain object successfully at ", topology.selfRef, " with href - ", href, "\n")
-                                
+
                                 link = ''
-                                
+
                                 try: # update the link as well
 
                                     link_name = "link-" + self.domain_obj.name + "-CHIC" # string - 'link-UM-CHIC'
@@ -435,9 +449,9 @@ class OSIRISApp(app_manager.RyuApp):
                                                     link = l
                                                     link.endpoints[0] = most_recent_domain
                                                     print('Verified the link to this domain.\n')
-                                                    print(link_map[key])                                                                           
-                                                    return 
-                                         
+                                                    print(link_map[key])
+                                                    return
+
                                     if link == '': # no link was found, add it to the topology
                                         print("No link found for this domain, creating and adding it to host topology...")
                                         new_link = Link({"name": link_name,
@@ -669,9 +683,9 @@ class OSIRISApp(app_manager.RyuApp):
 
                 print("CREATING NEW NODE: ", node_name)
                 is_of_instance = "Open" in lldp_host_obj.system_description          # had to be done
-                              
+
                 if is_of_instance is not True and lldp_host_obj.system_description is not None:
-                    node = Node({"name": node_name})    
+                    node = Node({"name": node_name})
                     self.logger.debug("Updating node description to %s" % lldp_host_obj.system_description)
                     node.description = lldp_host_obj.system_description
                     self.rt.insert(node, commit=True)
@@ -825,7 +839,6 @@ class OSIRISApp(app_manager.RyuApp):
 
     def check_port(self, port_name, switch_node):
         found = 0
-        port_name = port_name
         self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
         for port in switch_node.ports:
             # Need to convert port_name to UTF-8 because for some reason port_name gets resolved
@@ -850,10 +863,7 @@ class OSIRISApp(app_manager.RyuApp):
         :param port_index:
         :return: Port Object
         """
-
         for port in ports:
-            if port_index is not None and port_index == port.properties.vport_number:
-                return port
             if port_name is not None and port_name == port.name:
                 return port
 
@@ -893,6 +903,24 @@ class OSIRISApp(app_manager.RyuApp):
                 return port
         return None
 
+    def check_port_by_mac_address(self, node, mac_address):
+        """
+
+            Returns the first instance of Port Object which matches any condition
+        :param node:
+        :param mac_address:
+        :return: UnisRT Port Object
+
+        """
+        found = 0
+        self.logger.info("CHECKING FOR PORT %s IN SWITCH %s" % (port_name, switch_node.name))
+        for port in switch_node.ports:
+            if port.address.address == mac_address:
+                return port
+
+        self.logger.info("PORT %s NOT FOUND IN SWITCH %s" % (port_name, switch_node.name))
+        return None
+
     def create_vport_object(self, port, switch_name):
         # Takes a port from RYU and converts it into a unisRT port object to push into the DB.
 
@@ -904,184 +932,5 @@ class OSIRISApp(app_manager.RyuApp):
         # ,"port_type":"vport", "vport_number": port.port_no.decode("utf-8")}
 
         return port_object
-
-class LLDPUtils:
-
-    @staticmethod
-    def get_dpid_from_chassis_id(chassis_id):
-        "Will be in the format dpid:0000080027c11115, to be converted to decimal of 0000080027c11115"
-        dec_value = int(chassis_id[5:], 16)
-        # print("get_dpid_from_chassis_id", dec_value)
-        return dec_value
-
-    @staticmethod
-    def determine_node_name_from_lldp(lldp_host_obj):
-        """
-            Implement Fallbacks for Node Name determination from the LLDP objects
-        :param lldp_host_obj:
-        :return: node_name or None if can be determined
-        """
-        node_name = None
-        if lldp_host_obj.host_type == LLDPHost.HOST_TYPE_SWITCH:
-            # print("////// FOUND SWITCH AS NODE /////")
-            dpid = LLDPUtils.get_dpid_from_chassis_id(lldp_host_obj.chassis_id)
-            node_name = "switch:" + str(dpid)
-        elif lldp_host_obj.system_name is not None:
-            # print("////// FOUND HOST AS NODE /////")
-            node_name = lldp_host_obj.system_name
-        elif lldp_host_obj.chassis_id is not None:
-            node_name = "device:"+str(lldp_host_obj.chassis_id)
-        return node_name
-
-    @staticmethod
-    def determine_port_name_from_lldp(lldp_host_obj):
-        """
-            Implement Fallbacks for Port Name determination from the LLDP objects
-        :param lldp_host_obj:
-        :return: port_name or None if can be determined
-        """
-        port_name = None
-        # the consequences of this simple function caused me physical pain. TODO: refactor entire program and rewrite this.
-        if lldp_host_obj.port_description is not None:
-            port_name = "port:" + lldp_host_obj.port_description
-        elif lldp_host_obj.port_id is not None:
-            port_name = (lldp_host_obj.port_id)
-        return str(port_name)
-
-
-class LLDPHost:
-
-    # Host Type
-    HOST_TYPE_LLDPD = 0
-    HOST_TYPE_SWITCH = 1
-
-    # Port ID Subtypes
-    PORT_ID_MAC_ADDRESS = 0
-    PORT_ID_NUMBER = 1
-
-    # Chassis ID Subtypes
-    CHASSIS_ID_MAC_ADDRESS = 0
-    CHASSIS_ID_NAME = 1
-
-    def __init__(self, lldp_tlvs, logger):
-        self.logger = logger
-        self.host_type = None
-        self.chassis_id = None
-        self.chassis_id_subtype = None
-        self.port_id = None
-        self.port_id_subtype = None
-        self.system_name = None
-        self.system_description = None
-        self.port_description = None
-        self.management_addresses = []
-        for tlv in lldp_tlvs.tlvs:
-            if tlv.tlv_type == lldp.LLDP_TLV_CHASSIS_ID:
-                # pprint("------LLDP_TLV_CHASSIS_ID-----")
-                self.parse_chassis_id(tlv)
-            elif tlv.tlv_type == lldp.LLDP_TLV_PORT_ID:
-                self.parse_port_id(tlv)
-                # pprint("------LLDP_TLV_PORT_ID-----")
-            elif tlv.tlv_type == lldp.LLDP_TLV_PORT_DESCRIPTION:
-                # pprint("------LLDP_TLV_PORT_DESCRIPTION-----")
-                self.port_description = tlv.tlv_info.decode("utf-8")
-            elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_NAME:
-                # pprint("------LLDP_TLV_SYSTEM_NAME-----")
-                self.system_name = tlv.tlv_info.decode("utf-8")
-            elif tlv.tlv_type == lldp.LLDP_TLV_SYSTEM_DESCRIPTION:
-                # pprint("------LLDP_TLV_SYSTEM_DESCRIPTION-----")
-                self.system_description = tlv.tlv_info.decode("utf-8")
-            elif tlv.tlv_type == lldp.LLDP_TLV_MANAGEMENT_ADDRESS:
-                # pprint("------LLDP_TLV_MANAGEMENT_ADDRESS-----")
-                self.parse_management_address(tlv)
-        self.parse_host_type()
-        self.display()
-
-    @staticmethod
-    def lldp_parse_new(data):
-        pkt = packet.Packet(data)
-        i = iter(pkt)
-        eth_pkt = six.next(i)
-        assert type(eth_pkt) == ethernet.ethernet
-        lldp_pkt = six.next(i)
-        if type(lldp_pkt) != lldp.lldp:
-            raise LLDPPacket.LLDPUnknownFormat()
-        return lldp_pkt
-
-    def parse_host_type(self):
-        if self.chassis_id is not None and self.chassis_id_subtype == LLDPHost.CHASSIS_ID_NAME and \
-                        "dpid:" in self.chassis_id:
-            self.host_type = LLDPHost.HOST_TYPE_SWITCH
-        else:
-            self.host_type = LLDPHost.HOST_TYPE_LLDPD
-# TLV type parsers
-    def parse_chassis_id(self, tlv_chassis_id):
-        if tlv_chassis_id.subtype == lldp.ChassisID.SUB_LOCALLY_ASSIGNED:
-            chassis_id = tlv_chassis_id.chassis_id.decode('utf-8')
-            # pprint(chassis_id)
-            self.chassis_id_subtype = LLDPHost.CHASSIS_ID_NAME
-            self.chassis_id = chassis_id
-        elif tlv_chassis_id.subtype == lldp.ChassisID.SUB_MAC_ADDRESS:
-            # pprint(self.parse_mac_address(tlv.chassis_id))
-            self.chassis_id_subtype = LLDPHost.CHASSIS_ID_MAC_ADDRESS
-            self.chassis_id = self.parse_mac_address(tlv_chassis_id.chassis_id)
-            # elif tlv.subtype == lldp.ChassisID.
-
-    def parse_port_id(self, tlv_port_id):
-        if tlv_port_id.subtype == lldp.PortID.SUB_PORT_COMPONENT:
-            port_id = tlv_port_id.port_id
-            if len(port_id) == LLDPPacket.PORT_ID_SIZE:
-                (src_port_no, ) = struct.unpack(LLDPPacket.PORT_ID_STR, port_id)
-                self.port_id_subtype = LLDPHost.PORT_ID_NUMBER
-                self.port_id = src_port_no
-        elif tlv_port_id.subtype == lldp.PortID.SUB_MAC_ADDRESS:
-            self.port_id_subtype = LLDPHost.PORT_ID_MAC_ADDRESS
-            self.port_id = self.parse_mac_address(tlv_port_id.port_id)
-
-    def parse_management_address(self, tlv_management_address):
-        if tlv_management_address.addr_subtype == 1:
-            # pprint("------IPv4 address----")
-            self.management_addresses.append(self.parse_ipv4_address(tlv_management_address.addr))
-        elif tlv_management_address.addr_subtype == 2:
-            # pprint("---- IPv6 address----")
-            self.management_addresses.append(self.parse_ipv6_address(tlv_management_address.addr))
-# Utilities
-    def parse_mac_address(self, hex_string):
-        mac_string = codecs.encode(hex_string, 'hex').decode('utf-8')
-        new_string = ""
-        for i in range(0, len(mac_string)):
-            if i != 0 and i % 2 == 0:
-                new_string += ':'
-            new_string += str(mac_string[i])
-        return new_string
-
-    def parse_ipv4_address(self, ip_binary_string):
-        ip_hex_string = codecs.encode(ip_binary_string, 'hex')
-        self.logger.info(ip_hex_string)
-        ip_dec_string = ""
-        for i in range(0, 4):
-            ip_dec_string += str(int(ip_hex_string[2*i:2*i+2], 16))
-            if i != 3:
-                ip_dec_string += "."
-        return ip_dec_string
-
-    def parse_ipv6_address(self, ip_binary_string):
-        ip_hex_string = codecs.encode(ip_binary_string, 'hex').decode('utf-8')
-        self.logger.info(ip_hex_string)
-        ipv6_string = ""
-        for i in range(0, 8):
-            ipv6_string += str(ip_hex_string[4 * i:4 * i + 4])
-            if i != 7:
-                ipv6_string += ":"
-        return ipv6_string
-
-
-    def display(self):
-        self.logger.info("==== Printing the LLDP Host details ====")
-        self.logger.info(self.chassis_id)
-        self.logger.info(self.port_id)
-        #self.logger.info(self.port_description)
-        #self.logger.info(self.system_name)
-        #self.logger.info(self.system_description)
-        #self.logger.info(self.management_addresses)
 
 app_manager.require_app('ryu.app.ofctl_rest')

@@ -1,4 +1,7 @@
-
+'''
+    I dont think this is used at all in the switch. Think I undersand why this is here, but it looks like
+    these helper functions were never actually used. 
+'''
 
 class Topology():
     def __init__(self):
@@ -110,7 +113,3 @@ class IntermediateNode:
 
             for link_dict in self.inodes[inode_name]:
                 self.__print_link(link_dict)
-
-
-
-
