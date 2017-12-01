@@ -371,7 +371,10 @@ class OSIRISApp(app_manager.RyuApp):
         src = eth_pkt.src
 
         # get the received port number from packet_in message.
-        in_port = msg.in_port
+        try:
+            in_port = msg.match['in_port']
+        except Exception:
+            in_port =msg.in_port
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
