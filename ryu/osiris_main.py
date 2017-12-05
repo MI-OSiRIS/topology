@@ -191,8 +191,14 @@ class OSIRISApp(app_manager.RyuApp):
 
             print("PRINTING ALIVE DICT ITEM")
             print(self.alive_dict[id_].selfRef)
+            if not self.alive_dict[id_].selfRef or self.alive_dict[id_].selfRef == '':
+                self.alive_dict[id_].update(commit=True)
             self.alive_dict[id_].commit()
-            #self.alive_dict[id_].poke()
+
+        for id_ in self.alive_dict:
+            print("POKING", self.alive_dict[id_].selfRef)
+            print("OBJ: ", self.alive_dict[id_])
+            self.alive_dict[id_].poke()
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
@@ -374,13 +380,13 @@ class OSIRISApp(app_manager.RyuApp):
         try:
             in_port = msg.match['in_port']
         except Exception:
-            in_port =msg.in_port
+            in_port = msg.in_port
 
         if eth_pkt.ethertype == ether_types.ETH_TYPE_LLDP:
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
             lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
-
             # CREATE NODE and PORT
+            print("MANAGEMENT ADDRESS", lldp_host_obj)
             self.check_add_node_and_port(lldp_host_obj, in_port=in_port)
             # CREATE the LINK
             self.create_links(datapath, in_port, lldp_host_obj)
@@ -560,6 +566,9 @@ class OSIRISApp(app_manager.RyuApp):
         switch_name = "switch:"+str(datapath.id)
         port_object = None
         ports_list = []
+
+        print(switch)
+        print("SWITCH: ", switch_name)
 
         self.logger.info("**** Adding the switch *****")
         # Nodes
@@ -770,12 +779,14 @@ class OSIRISApp(app_manager.RyuApp):
             print("SEARCHING " + node_name + " for port " + port_name)
             host_port = self.check_port_in_node(node, port_name)
             print(host_port)
-            if host_port:
+            if host_port is not None:
                 print("HOST PORT FOUND - ", host_port)
             else:
                 print("Checking as port number: ", port_number)
                 try:
-                    host_port = self.check_port_in_node(node, port_name)
+                    host_port = self.check_port_in_node_by_port_number(node, port_name)
+                    if host_port is not None:
+                        print("Found Host Port: ", host_port.name)
                 except Exception:
                     return
 
