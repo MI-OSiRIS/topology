@@ -111,10 +111,13 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("----- UPDATE INTERVAL IS %d -------" % self.interval_secs)
         self.logger.info("Connecting to UNIS Server at "+unis_server)
         self.logger.info("Connecting to Domain: "+self.domain_name)
-        self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
+
         ## UnisRT debug lines
         #unis.logging.setLevel(unis.logging.DEBUG)
         #unis.logging.doTrace(True)
+
+        self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
+
         ##end debug lines
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
