@@ -115,7 +115,7 @@ class OSIRISApp(app_manager.RyuApp):
         ## UnisRT debug lines
         #unis.logging.setLevel(unis.logging.DEBUG)
         #unis.logging.doTrace(True)
-
+        print("UNIS SERVER: ", self.CONF.osiris.unis_server)
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
 
         ##end debug lines
@@ -129,7 +129,7 @@ class OSIRISApp(app_manager.RyuApp):
         print("Making Topology...")
         self.instantiate_local_topology()
         print("Attemping to Update Host Topology")
-        #self.check_update_host_topology()
+        self.check_update_host_topology()
         print('UPDATED HOST TOPOLOGY')
         self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
         self.create_domain()
@@ -389,7 +389,7 @@ class OSIRISApp(app_manager.RyuApp):
             self.logger.info("LLDP packet in %s %s %s %s %x", dpid, src, dst, in_port, eth_pkt.ethertype)
             lldp_host_obj = LLDPHost(LLDPHost.lldp_parse_new(msg.data), self.logger)
             # CREATE NODE and PORT
-            print("MANAGEMENT ADDRESS", lldp_host_obj)
+            print("MANAGEMENT ADDRESS", lldp_host_obj.management_addresses)
             self.check_add_node_and_port(lldp_host_obj, in_port=in_port)
             # CREATE the LINK
             self.create_links(datapath, in_port, lldp_host_obj)
@@ -446,10 +446,10 @@ class OSIRISApp(app_manager.RyuApp):
                                 print("Found current matching domain in UNIS Host...")
                                 match = unis_href
                                 topology.domains[index] = most_recent_domain
-                                #host_rt.flush() # not sure if this is necessary, will experiment
+                                host_rt.flush() # not sure if this is necessary, will experiment
                                 print("\nDomain: ", self.domain_obj.name, ", updated domain object successfully at ", topology.selfRef, " with href - ", href, "\n")
-
-                                link = ''
+                                topology.commit()
+                                link = '' 
 
                                 try: # update the link as well
 
@@ -464,14 +464,15 @@ class OSIRISApp(app_manager.RyuApp):
                                                     print(link_map[key])
                                                     return
 
-                                    if link == '': # no link was found, add it to the topology
+                                    if link == '' or topology.links == []: # no link was found, add it to the topology
                                         print("No link found for this domain, creating and adding it to host topology...")
                                         new_link = Link({"name": link_name,
                                                         "directed": False,
                                                         "endpoints":
                                                             [most_recent_domain,
                                                             {"href" : "$.domains[?(@.name==\"CHIC PoP\")]", "rel": "full"}]})
-                                        topology.links.append(new_link, commit='True')
+                                        topology.links.append(new_link)
+                                        host_rt.flush()                                    
                                         print("Generated new link to the current domain.\n")
 
                                 except Exception:
@@ -482,14 +483,14 @@ class OSIRISApp(app_manager.RyuApp):
                 except Exception:
                         logging.exception('Trouble Updating Unis Host Topology... Continuing')
 
-                current_rt.shutdown()
+
 
         if match == '':                                              # TODO: occurs if no match was found, if so then add it to the topology, not sure if would work correctly in this object though..
                 print('No match found for: ', self.domain_obj.name, ', adding domain to host site, ', topology.selfRef)
                 # not sure how to go about this since a we are not pushing the remote object to the host but instead 'updating' it.
 
 
-        host_rt.shutdown()  # close connections to other Runtimes
+
         print("Finishing Up startup")
         return
 
@@ -703,6 +704,10 @@ class OSIRISApp(app_manager.RyuApp):
                     node = Node({"name": node_name})
                     self.logger.debug("Updating node description to %s" % lldp_host_obj.system_description)
                     node.description = lldp_host_obj.system_description
+                    try:
+                        node.properties.mgmtaddr = lldp_host_obj.management_addresses[0]
+                    except Exception:
+                        print("Couldnt get IP")
                     self.rt.insert(node, commit=True)
                     self.domain_obj.nodes.append(node)
 
