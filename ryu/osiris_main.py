@@ -185,11 +185,6 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info(self.alive_dict)
         for id_ in self.alive_dict:
 
-            # Manually doing what poke does to see what is breaking here...
-            #obj = self.alive_dict[id_]
-            #obj.__dict__["ts"] = int(time.time() * 1000000)
-            #payload = json.dumps({"ts": obj.ts})
-            #obj._runtime._unis.put(obj.selfRef, payload)
             self.logger.info("----- id_ : %s -------" % id_)
 
             print("PRINTING ALIVE DICT ITEM")

@@ -162,6 +162,7 @@ class LLDPHost:
         elif tlv_management_address.addr_subtype == 2:
             # pprint("---- IPv6 address----")
             self.management_addresses.append(self.parse_ipv6_address(tlv_management_address.addr))
+        
 # Utilities
     def parse_mac_address(self, hex_string):
         mac_string = codecs.encode(hex_string, 'hex').decode('utf-8')
