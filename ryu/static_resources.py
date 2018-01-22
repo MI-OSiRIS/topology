@@ -87,6 +87,8 @@ class StaticResourceBuilder:
         else:
             print("Node ", node.name, "already in UNIS.")
             self.nodes.append(check_node)
+            print("Poking resource...")
+            check_node.poke()
             self.nodes[-1].temp_ports = item['Ports'].split(' ')
 
     def build_port(self, item):
@@ -104,6 +106,8 @@ class StaticResourceBuilder:
             print("PORT NOT FOUND IN UNIS... UPLOADING ENTRY")
         else:
             print("Port ", port.name, "already in UNIS.")
+            print("Poking resource...")
+            check_port.poke()
             self.ports.append(check_port)
 
 
