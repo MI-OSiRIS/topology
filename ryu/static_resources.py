@@ -103,6 +103,7 @@ class StaticResourceBuilder:
 
         if check_port == None:
             self.rt.insert(port, commit=True)
+            self.ports.append(port)
             print("PORT NOT FOUND IN UNIS... UPLOADING ENTRY")
         else:
             print("Port ", port.name, "already in UNIS.")
@@ -112,12 +113,7 @@ class StaticResourceBuilder:
 
 
     def build_link(self, item):
-        link = Link()
-        link.directed = item['Directed']
-        link.temp_host_endpoint = item['HostPort']
-        link.temp_dest_endpoint = item['DestPort']
-        link.endpoints = []
-
+        link = Link({"name": item['Name'], "directed": False, "temp_host_endpoint":item['HostPort'], "temp_dest_endpoint": item['DestPort'], "endpoints": []})
         self.links.append(link)
 
 ##############################################################################################
@@ -135,11 +131,18 @@ class StaticResourceBuilder:
                     node.ports.append(port)
 
     def connect_links(self, link):
-        for port in self.ports:
+
+        host_port = None
+        dest_port = None
+        for port in self.rt.ports:
             if port.name == link.temp_host_endpoint:
-                link.endpoints.source = port
+                host_port = port
             elif port.name == link.temp_dest_endpoint:
-                link.endpoints.destination = port
+                dest_port = port
+
+        link.endpoints = [host_port, dest_port]
+        print(link.endpoints)
+        print("LINK JSON: ", link.to_JSON())
 
         if self.check_link_in_unis(link) == None:
             print("UPLOADING LINK ENTRY ")
@@ -201,3 +204,4 @@ if __name__ == "__main__":
     SRB = StaticResourceBuilder('config/static_resources.ini', rt)
     SRB.manifest()
     SRB.show_resources()
+    print("Done writing static resources)
