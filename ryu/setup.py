@@ -24,9 +24,10 @@ setuptools.setup(name='osiris-sdn-app',
                          ],
                  install_requires=[
                      'unisrt',
-                     'ryu'
+                     'ryu',
+                     'configparser'
                  ],
                  options = {'bdist_rpm':{'post_install' : 'config/RPM/centos_postinstall.sh',
                                          'post_uninstall' : 'config/RPM/centos_postuninstall.sh'}},
-                 
+
              )

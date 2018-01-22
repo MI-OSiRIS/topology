@@ -55,12 +55,14 @@ class StaticResourceBuilder:
 
     def connect(self):
         for node in self.nodes:
+            print(node.temp_ports)
             self.connect_ports(node)
         for link in self.links:
             self.connect_links(link)
 
     def manifest(self):
         self.build()
+        self.show_resources()
         self.connect()
 
 ##############################################################################################
@@ -75,8 +77,17 @@ class StaticResourceBuilder:
         node.mgmtaddress = item['Address']
         node.description = item['Description']
         node.temp_ports = item['Ports'].split(' ')
-        self.rt.insert(node, commit=True)
-        self.nodes.append(node)
+
+        check_node = self.check_node_in_unis(node)
+
+        if check_node == None:
+            self.rt.insert(node, commit=True)
+            self.nodes.append(node)
+            print("NODE NOT FOUND IN UNIS... UPLOADING ENTRY")
+        else:
+            print("Node ", node.name, "already in UNIS.")
+            self.nodes.append(check_node)
+            self.nodes[-1].temp_ports = item['Ports'].split(' ')
 
     def build_port(self, item):
         port = Port()
@@ -85,8 +96,16 @@ class StaticResourceBuilder:
         port.address.address = item['Address']
         port.properties.type = item['PortType']
         port.properties.port_number = item['PortNumber']
-        self.rt.insert(port, commit=True)
-        self.ports.append(port)
+
+        check_port = self.check_port_in_unis(port)
+
+        if check_port == None:
+            self.rt.insert(port, commit=True)
+            print("PORT NOT FOUND IN UNIS... UPLOADING ENTRY")
+        else:
+            print("Port ", port.name, "already in UNIS.")
+            self.ports.append(check_port)
+
 
     def build_link(self, item):
         link = Link()
@@ -94,6 +113,7 @@ class StaticResourceBuilder:
         link.temp_host_endpoint = item['HostPort']
         link.temp_dest_endpoint = item['DestPort']
         link.endpoints = []
+
         self.links.append(link)
 
 ##############################################################################################
@@ -102,6 +122,7 @@ class StaticResourceBuilder:
     '''
 
     def connect_ports(self, node):
+        print("TPORTS: ", node.temp_ports)
         for tport in node.temp_ports:
             for port in self.ports:
                 print("Checking ", tport, " - ", port.name)
@@ -115,12 +136,51 @@ class StaticResourceBuilder:
                 link.endpoints.source = port
             elif port.name == link.temp_dest_endpoint:
                 link.endpoints.destination = port
+
+        if self.check_link_in_unis(link) == None:
+            print("UPLOADING LINK ENTRY ")
+            self.rt.insert(link, commit=True)
+
+        else:
+            print("Link ", link.name, "already in UNIS.")
         return
 
 ##############################################################################################
     '''
-        Helper function
+        Helper functions
     '''
+
+    def check_port_in_unis(self, port):
+        port_name = port.name
+        print("CHECKING FOR PORT ", port_name)
+        for port in self.rt.ports:
+            if port.name == port_name:
+                return port
+
+        print("PORT NOT FOUND IN UNIS", r_name)
+        return None
+
+    def check_node_in_unis(self, node):
+        node_name = node.name
+        print("CHECKING FOR RESOURCE ", node_name)
+        for node in self.rt.nodes:
+            if node.name == node_name:
+                return node
+
+        print("NODE NOT FOUND IN UNIS", r_name)
+        return None
+
+    def check_link_in_unis(self, link):
+        link_name = link.name
+        print("CHECKING FOR LINK ", link_name)
+        for link in self.rt.links:
+            if link.name == link_name:
+                return item
+
+        print("LINK NOT FOUND IN UNIS", link_name)
+        return None
+
+
     def show_resources(self):
         pp.pprint(self.nodes)
         pp.pprint(self.ports)
@@ -129,7 +189,7 @@ class StaticResourceBuilder:
 
 #############################################################################################
 '''
-    Main defined for convenient testing.
+    Main defined for convenient testing. And Usage.
 '''
 if __name__ == "__main__":
     rt = Runtime('http://msu-ps01.osris.org:8888',
