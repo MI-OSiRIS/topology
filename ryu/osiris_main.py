@@ -186,17 +186,24 @@ class OSIRISApp(app_manager.RyuApp):
         for id_ in self.alive_dict:
 
             self.logger.info("----- id_ : %s -------" % id_)
+            try:
 
-            print("PRINTING ALIVE DICT ITEM")
-            print(self.alive_dict[id_].selfRef)
-            if not self.alive_dict[id_].selfRef or self.alive_dict[id_].selfRef == '':
-                self.alive_dict[id_].update(commit=True)
-            self.alive_dict[id_].commit()
-
-        for id_ in self.alive_dict:
+                print("PRINTING ALIVE DICT ITEM")
+                print(self.alive_dict[id_].selfRef)
+                if not self.alive_dict[id_].selfRef or self.alive_dict[id_].selfRef == '':
+                    self.rt.insert(self.alive_dict[id_])
+                    self.alive_dict[id_].commit()
+                    self.alive_dict[id_].update()
+                    self.alive_dict[id_].poke()
+                else: 
+                    self.alive_dict[id_].commit()
+                    self.alive_dict[id_].update()
+            except:
+                print("Could not update - ", self.alive_dict[id_])
+            print("OLD TS: ", self.alive_dict[id_].ts)
             print("POKING", self.alive_dict[id_].selfRef)
-            print("OBJ: ", self.alive_dict[id_])
-            self.alive_dict[id_].poke()
+            print("NEW TS: ", self.alive_dict[id_].ts, '\n') 
+
         self.logger.info("----- send_alive_dict_updates done -------")
         # reset
         self.alive_dict = dict()
