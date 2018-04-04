@@ -38,8 +38,9 @@ from ryu import cfg
 import unis
 from unis.models import *
 from unis.runtime import Runtime
-from unis import logging as ulog
-from unis.models.models import UnisList
+import lace
+from lace.logging import trace
+
 from lldp_manager import LLDPHost, LLDPUtils
 
 # turn down various loggers
@@ -106,6 +107,7 @@ class OSIRISApp(app_manager.RyuApp):
         ], group="osiris")
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
+        self.unis_server = self.CONF.osiris.unis_server
         self.unis_host = self.CONF.osiris.unis_host
         self.interval_secs = int(self.CONF.osiris.unis_update_interval)
         self.logger.info("----- UPDATE INTERVAL IS %d -------" % self.interval_secs)
@@ -113,12 +115,11 @@ class OSIRISApp(app_manager.RyuApp):
         self.logger.info("Connecting to Domain: "+self.domain_name)
 
         ## UnisRT debug lines
-        #unis.logging.setLevel(unis.logging.DEBUG)
-        #unis.logging.doTrace(True)
+        #trace.setLevel(lace.logging.DEBUG) 
         print("UNIS SERVER: ", self.CONF.osiris.unis_server)
-        self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
-
-        ##end debug lines
+        self.rt = Runtime(unis_server, proxy={ 'subscribe':False,'defer_update':True })
+        print(self.rt.settings['proxy'])
+       
         self.create_domain()
         self.update_time_secs = calendar.timegm(time.gmtime())
         # Transient dict of LLDP-discovered Nodes, Ports and Links which are reset every cycle
@@ -131,9 +132,12 @@ class OSIRISApp(app_manager.RyuApp):
         print("Attemping to Update Host Topology")
         self.check_update_host_topology()
         print('UPDATED HOST TOPOLOGY')
-        self.rt = Runtime(unis_server, subscribe=False, defer_update=True)
+        self.rt = Runtime(unis_server,proxy = {"subscribe":False, "defer_update":True})
+        print("Created initial RT instance")
         self.create_domain()
-
+        print("Checked domain")
+        self.nodelist = {}
+        
 ####### UNIS Update functions #########
     def send_updates_decorator(func):
         """
@@ -174,8 +178,10 @@ class OSIRISApp(app_manager.RyuApp):
                 continue # fixes the bug where OpenVSwitch Schema nodes were turning into regular nodes ¯\_(ツ)_/¯ will return to this eventually
             self.switches_dict[id_].poke()
         self.logger.info("----- send_switches_updates end -------")
+        print("\n LIST OF NODES SEEN: ", self.nodelist)
 
-
+        # Torch old rt and reinstantiate, for some reason the rt is getting blown during program
+        self.rt = Runtime(self.unis_server, proxy= {"subscribe":False, "defer_update":True})
     def send_alive_dict_updates(self):
         """
             Updates of LLDP discovered nodes, ports and links which are reset every cycle
@@ -394,8 +400,11 @@ class OSIRISApp(app_manager.RyuApp):
             print("MANAGEMENT ADDRESS", lldp_host_obj.management_addresses)
             self.check_add_node_and_port(lldp_host_obj, in_port=in_port)
             # CREATE the LINK
-            self.create_links(datapath, in_port, lldp_host_obj)
+            try:
 
+                self.create_links(datapath, in_port, lldp_host_obj)
+            except:
+                print("Count not create Link")
 ######### INIT helper functions ########
     def instantiate_local_topology(self):
         '''
@@ -424,7 +433,8 @@ class OSIRISApp(app_manager.RyuApp):
 
             Also updates the link in the host that connects the topology to ChicPOP
         '''
-        host_rt = Runtime(self.CONF.osiris.unis_host)      # we are going to update the 'main' topology based on the what is in the configuration file
+        print("UNIS HOST: ", self.unis_host)
+        host_rt = Runtime(self.unis_host)      # we are going to update the 'main' topology based on the what is in the configuration file
         topology = host_rt.topologies[0]                   # the first topology instance is the most recent and AFAIK the one we want
         topology_dict = topology.to_JSON()                 # this is how we get around the Runtime essentially sandboxing us, treat JSON as a dict.
         href_list = []                                     # create something to store the hrefs we are about to gather
@@ -437,9 +447,9 @@ class OSIRISApp(app_manager.RyuApp):
 
         for index, href in enumerate(href_list):                                # time to sift through the different unis instances
 
-                unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO?
-                current_rt = Runtime(unis_href)
+                unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO? 
                 print("TESTING OUT ", unis_href)
+                current_rt = Runtime(unis_href)
                 try:
                         most_recent_domain = list(current_rt.domains.where({"name":self.domain_obj.name}))[0]
                         print("Comparing ",self.domain_obj.name, most_recent_domain.name)
@@ -622,7 +632,7 @@ class OSIRISApp(app_manager.RyuApp):
 
                     # updates unis port object with the correct port number. Unfortunately the schema is a string..
                     port_object.index = str(port.port_no)
-                    port_object.update(force=True)
+                    port_object.commit()
 
                     ports_list.append(port_object)
 
@@ -674,6 +684,7 @@ class OSIRISApp(app_manager.RyuApp):
         try:
             # Node Details
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
+            self.nodelist[node_name] = node_name
             if node_name is None:
                 self.logger.error("LLDP Node cannot be added due to insufficient information.")
                 return
@@ -722,7 +733,7 @@ class OSIRISApp(app_manager.RyuApp):
                 print("Creating Port: ", node_name + ":" + port_name )
 
                 port = Port(
-                       {"name": node_name + ":" + port_name, "address": {"type": port_address_type, "address": str(port_address)}})
+                       {"name": node_name + ":" + port_name, "address": {"type": port_address_type, "address": str(port_address)}, "properties":{}})
                 port.properties.type = "vport"
 
                 # this is a step to make port matching somewhat reasonable instead of praying it works...
@@ -730,7 +741,7 @@ class OSIRISApp(app_manager.RyuApp):
 
                 self.rt.insert(port, commit=True)
                 node.ports.append(port)
-                node.update(force=True)
+                #node.update(force=True)
                 self.domain_obj.ports.append(port)
                 self.rt.flush()
                 print(port.name + " added. ")
