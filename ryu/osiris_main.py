@@ -35,13 +35,23 @@ from ryu.lib.packet import ether_types
 from ryu.lib.packet import lldp
 from ryu.ofproto import *
 from ryu import cfg
+from ryu.ofproto import ofproto_v1_3
+from ryu.lib import ofctl_v1_3
+from ryu.lib.ovs import vsctl
+from ryu.lib.ovs.bridge import OVSBridge
+from ryu.app.rest_qos import *
+from ryu.app.simple_switch_13 import *
+from ryu.app.rest_conf_switch import *
+from ryu.services.protocols.ovsdb import api as ovsdb
+from ryu.services.protocols.ovsdb import event as ovsdb_event
 import unis
 from unis.models import *
 from unis.runtime import Runtime
 import lace
 from lace.logging import trace
-
+import pprint
 from lldp_manager import LLDPHost, LLDPUtils
+import requests
 
 # turn down various loggers
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -91,22 +101,29 @@ class SystemCapabilities(lldp.LLDPBasicTLV):
                            self.system_cap, self.enabled_cap)
 
 class OSIRISApp(app_manager.RyuApp):
+    OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
+
     _CONTEXTS = {
+        'conf_switch': conf_switch.ConfSwitchSet,
         'switches': switches.Switches
     }
 
     def __init__(self, *args, **kwargs):
-        super(OSIRISApp, self).__init__(*args, **kwargs)
+        super(OSIRISApp, self).__init__(*args, **kwargs) 
         self.mac_to_port = {}
         self.datapaths = {}
         self.CONF.register_opts([
             cfg.StrOpt('unis_domain', default=''),
             cfg.StrOpt('unis_server', default='http://localhost:8888'),
             cfg.StrOpt('unis_update_interval', default='5'),
-            cfg.StrOpt('unis_host', default='http://iu-ps01.osris.org:8888')
+            cfg.StrOpt('unis_host', default='http://localhost:8888'),
+            cfg.StrOpt('ovsdb_addr', default='"tcp:127.0.0.1:6650"')
         ], group="osiris")
+         
+        
         self.domain_name = self.CONF.osiris.unis_domain
         unis_server = self.CONF.osiris.unis_server
+        self.ovsdb_addr = self.CONF.osiris.ovsdb_addr
         self.unis_server = self.CONF.osiris.unis_server
         self.unis_host = self.CONF.osiris.unis_host
         self.interval_secs = int(self.CONF.osiris.unis_update_interval)
@@ -176,12 +193,12 @@ class OSIRISApp(app_manager.RyuApp):
             print(self.switches_dict[id_].ts)
             if "Open" in self.switches_dict[id_].description:
                 continue # fixes the bug where OpenVSwitch Schema nodes were turning into regular nodes ¯\_(ツ)_/¯ will return to this eventually
-            self.switches_dict[id_].poke()
+            self.switches_dict[id_].touch()
         self.logger.info("----- send_switches_updates end -------")
         print("\n LIST OF NODES SEEN: ", self.nodelist)
 
         # Torch old rt and reinstantiate, for some reason the rt is getting blown during program
-        self.rt = Runtime(self.unis_server, proxy= {"subscribe":False, "defer_update":True})
+        #self.rt = Runtime(self.unis_server, proxy= {"subscribe":False, "defer_update":True})
     def send_alive_dict_updates(self):
         """
             Updates of LLDP discovered nodes, ports and links which are reset every cycle
@@ -197,17 +214,20 @@ class OSIRISApp(app_manager.RyuApp):
                 print("PRINTING ALIVE DICT ITEM")
                 print(self.alive_dict[id_].selfRef)
                 if not self.alive_dict[id_].selfRef or self.alive_dict[id_].selfRef == '':
+                    print("Adding new resource")
                     self.rt.insert(self.alive_dict[id_])
                     self.alive_dict[id_].commit()
-                    self.alive_dict[id_].update()
-                    self.alive_dict[id_].poke()
+                    #self.alive_dict[id_].update()
+                    self.alive_dict[id_].touch()
                 else: 
+                    print("Updating resource")
                     self.alive_dict[id_].commit()
-                    self.alive_dict[id_].update()
+                    #self.alive_dict[id_].update()
             except:
                 print("Could not update - ", self.alive_dict[id_])
             print("OLD TS: ", self.alive_dict[id_].ts)
             print("POKING", self.alive_dict[id_].selfRef)
+            self.alive_dict[id_].touch()
             print("NEW TS: ", self.alive_dict[id_].ts, '\n') 
 
         self.logger.info("----- send_alive_dict_updates done -------")
@@ -217,6 +237,7 @@ class OSIRISApp(app_manager.RyuApp):
         print("FLUSHED")
 
 ########### OpenFlow event Handlers #############
+
     @set_ev_cls(ofp_event.EventOFPStateChange,
                 [MAIN_DISPATCHER, DEAD_DISPATCHER])
     @send_updates_decorator
@@ -224,6 +245,7 @@ class OSIRISApp(app_manager.RyuApp):
         datapath = ev.datapath
         if ev.state == MAIN_DISPATCHER:
             if not datapath.id in self.datapaths:
+                pprint.pprint(ev.__dict__) 
                 self.logger.debug('register datapath: %016x', datapath.id)
                 self.datapaths[datapath.id] = datapath
         elif ev.state == DEAD_DISPATCHER:
@@ -234,6 +256,7 @@ class OSIRISApp(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_switch_topo(self, ev):
+        
         print("Switch Enter Event: ", ev.switch)
         switch_list = get_switch(self, ev.switch.dp.id)
         print("SWITCH: ", switch_list)
@@ -245,10 +268,37 @@ class OSIRISApp(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     @send_updates_decorator
-    def switch_enter_handler(self, ev):
+    def switch_enter_handler(self, ev): 
         self.logger.info("**** switch_enter_handler *****")
+        hex_dpid = "%016x" % ev.switch.dp.id
+        """self.logger.info("**** register QoS *****")
+        OVSDB_ADDR = 'tcp:127.0.0.1:6650'
+        ovs_vsctl = vsctl.VSCtl(OVSDB_ADDR)
+        command = vsctl.VSCtlCommand(
+            'find',
+            ('Bridge',
+            'datapath_id=%s' % hex_dpid))
+        
+        ovs_vsctl.run_command([command])
+        endpoint = "http://localhost:8081/v1.0/conf/switches/" + hex_dpid + "/ovsdb_addr"  
+        print("Attempting to register switch id %016x to QoS service." % ev.switch.dp.id)
+        print("Endpoint: ", endpoint)
+        # dpids need to be in hex for qos stuff
+        
+        print('"tcp:127.0.0.1:6650"', self.ovsdb_addr) 
+
+        try:
+            res = requests.put(endpoint, data = self.ovsdb_addr )
+            print("Requested update to OVSDB with switch id " + hex_dpid + " address " + self.ovsdb_addr)
+            print(res)
+        except Exception as e:
+            print("Registration to address " + self.ovsdb_addr + " failed with: " + e)
+        
+        """
+        
         self.check_add_switch(ev.switch, ev.switch.dp)
-        self.send_desc_stats_request(ev.switch.dp)
+        self.send_desc_stats_request(ev.switch.dp) 
+        
         self.logger.info("**** switch_enter_handler done*****")
 
     @set_ev_cls(ofp_event.EventOFPPortStateChange, [MAIN_DISPATCHER, DEAD_DISPATCHER])
@@ -783,25 +833,28 @@ class OSIRISApp(app_manager.RyuApp):
                 if node.name == "switch:"+str(dpid):
                     self.logger.info("SWITCH NODE FOUND - NAME:"+node.name)
                     self.logger.info("SWITCH NODE FOUND - ID:" + node.id)
-                    for port in node.ports:
-                        if port.properties.vport_number == in_port:
+                    for port in node.ports: 
+                        if int(port.properties.vport_number) == in_port:
                             switch_node = node
                             switch_port = port
                             print("PORT MATCH: ", port.name, " on port number - ", port.properties.vport_number)
                             break
+            if switch_port == None:
+                print("NO SWITCH_PORT FOUND")
+                print("In port: ", in_port)
 
             # FIND THE OTHER NODE/PORT
             node_name = LLDPUtils.determine_node_name_from_lldp(lldp_host_obj)
             print("LLDP UTILS FOUND: ", node_name)
             node = self.check_node(node_name)
-
+            print(node.to_JSON())
             port_name = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             port_number = LLDPUtils.determine_port_name_from_lldp(lldp_host_obj)
             print("SEARCHING " + node_name + " for port " + port_name)
             host_port = self.check_port_in_node(node, port_name)
-            print(host_port)
+            #print(host_port)
             if host_port is not None:
-                print("HOST PORT FOUND - ", host_port)
+                print("HOST PORT FOUND - ", host_port.to_JSON())
             else:
                 print("Checking as port number: ", port_number)
                 try:
@@ -811,12 +864,12 @@ class OSIRISApp(app_manager.RyuApp):
                 except Exception:
                     return
 
-
+            print("SWITCH PORT: ",switch_port.to_JSON())
             if switch_port is not None and host_port is not None:
 
                 self.logger.info("======Creating a link =======")
                 print("CONNECTING THESE PORTS")
-                print(host_port, switch_port)
+                print(host_port.to_JSON(), switch_port.to_JSON())
 
                 print("HOST PORT NAME - ", host_port.name)
                 print("SWITCH PORT NAME - ", switch_port.name)
@@ -830,7 +883,7 @@ class OSIRISApp(app_manager.RyuApp):
 
                 print("LINK SWITCH PORT: ", switch_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
                 print("LINK HOST PORT: ", host_port.name, " ||||||||||||||||||||||||||||||||||||||||||")
-
+                
                 print("SWITCH PORT SELF REF: ", switch_port.selfRef)
                 print("HOST PORT SELF REF: ", host_port.selfRef)
                 if switch_port.selfRef == "" or host_port.selfRef == "":
@@ -970,4 +1023,7 @@ class OSIRISApp(app_manager.RyuApp):
 
         return port_object
 
+app_manager.require_app('ryu.app.simple_switch_13')
+app_manager.require_app('ryu.app.rest_conf_switch')
+app_manager.require_app('ryu.app.rest_qos')
 app_manager.require_app('ryu.app.ofctl_rest')

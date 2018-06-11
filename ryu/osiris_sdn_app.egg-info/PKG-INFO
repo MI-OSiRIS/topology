@@ -1,10 +1,19 @@
-Metadata-Version: 1.0
+Metadata-Version: 1.1
 Name: osiris-sdn-app
 Version: 0.1
 Summary: Topology Discovery and SDN Control Ryu Application
-Home-page: UNKNOWN
-Author: UNKNOWN
-Author-email: UNKNOWN
-License: UNKNOWN
+Home-page: http://www.osris.org/
+Author: Supreeth Shivanand
+Author-email: osrs-nmal@umich.edu
+License: Apache License 2.0
 Description: UNKNOWN
-Platform: UNKNOWN
+Keywords: topology,openflow,NMAL,OSIRIS
+Platform: any
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Topic :: System :: Networking
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Operating System :: Unix

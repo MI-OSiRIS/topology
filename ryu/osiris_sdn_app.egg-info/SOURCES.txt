@@ -5,6 +5,7 @@ setup.cfg
 setup.py
 config/logging.conf
 config/osiris-sdn-app.conf
+config/static_resources.ini
 config/supervisor.conf
 config/RPM/centos_postinstall.sh
 config/RPM/centos_postuninstall.sh
