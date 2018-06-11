@@ -703,7 +703,8 @@ class OSIRISApp(app_manager.RyuApp):
                 self.logger.info("\n****OLD PORT***")
 
                 # The following line is a temporary fix so the merge function works correctly
-                port_object = self.find_port(self.domain_obj.ports, port.name.decode("utf-8"), port.port_no)
+                port_object = self.find_port(self.domain_obj.ports, switch_name + ":" + port.name.decode("utf-8"), port.port_no)
+                print(port_object.to_JSON())
                 port_object = self.merge_port_diff(port_object, port, switch_name)
 
             ports_list.append(port_object)
