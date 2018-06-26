@@ -223,6 +223,8 @@ class OSIRISApp(app_manager.RyuApp):
                     print("Updating resource")
                     self.alive_dict[id_].commit()
                     #self.alive_dict[id_].update()
+		    self.rt.flush()
+		    self.alive_dict[id_].touch()
             except:
                 print("Could not update - ", self.alive_dict[id_])
             print("OLD TS: ", self.alive_dict[id_].ts)
