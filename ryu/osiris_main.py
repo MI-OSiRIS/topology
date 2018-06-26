@@ -227,7 +227,7 @@ class OSIRISApp(app_manager.RyuApp):
                 print("Could not update - ", self.alive_dict[id_])
             print("OLD TS: ", self.alive_dict[id_].ts)
             print("POKING", self.alive_dict[id_].selfRef)
-            self.alive_dict[id_].touch()
+            #self.alive_dict[id_].touch()
             print("NEW TS: ", self.alive_dict[id_].ts, '\n') 
 
         self.logger.info("----- send_alive_dict_updates done -------")
