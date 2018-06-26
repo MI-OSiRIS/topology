@@ -867,12 +867,12 @@ class OSIRISApp(app_manager.RyuApp):
                 except Exception:
                     return
 
-            print("SWITCH PORT: ",switch_port.to_JSON())
+            #print("SWITCH PORT: ",switch_port.to_JSON())
             if switch_port is not None and host_port is not None:
 
                 self.logger.info("======Creating a link =======")
                 print("CONNECTING THESE PORTS")
-                print(host_port.to_JSON(), switch_port.to_JSON())
+                #print(host_port.to_JSON(), switch_port.to_JSON())
 
                 print("HOST PORT NAME - ", host_port.name)
                 print("SWITCH PORT NAME - ", switch_port.name)
