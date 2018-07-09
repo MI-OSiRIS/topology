@@ -366,7 +366,7 @@ class OSIRISApp(app_manager.RyuApp):
                     # TODO: get away from using Index for port number, remnant of previous spaghetti.
                     port_object.address.vport_number = port_number
                     port_object.index = str(port_number)
-                    port_object.vport_number = port_number
+                    port_object.properties.vport_number = port_number
                     print("ADD - ", port_object)
                     # add found port to switch
                     self.switches_dict[switch_node.id].ports.append(port_object)
