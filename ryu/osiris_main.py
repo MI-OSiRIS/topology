@@ -331,12 +331,15 @@ class OSIRISApp(app_manager.RyuApp):
 
         if port_state == 0:
             # if port state is 0, track down the deleted port object from current switch using the port_number.
-            port_object = self.find_port(switch_node.ports, port_index=str(port_number))
+            port_object = self.find_port(switch_node.ports, port_index=port_number)
+            print("searching for vport num: ", port_number)
+            for port in switch_node.ports:
+                print("port: ", port.name, " - ", port.properties.vport_number)
             print(port_object)
             self.logger.info('PORT DELETE')
 
             # checks node for port on whatever port number EV said was deleted and removes it.
-            check = self.check_port_in_node(node, switch_name + ':' + port_name)
+            check = self.check_port_in_node_by_name(switch_node, port_object.name)
             print("Checking port result: %s" % check)
 
             if check is not None:
@@ -345,8 +348,8 @@ class OSIRISApp(app_manager.RyuApp):
 
                 self.switches_dict[switch_node.id].ports.remove(port_object)
 
-                self.switches_dict[switch_node.id].update(force=True)
-
+                self.switches_dict[switch_node.id].commit()
+                self.rt.flush()
 
                 self.logger.info('PORT DELETED with %d number and %s id', port_number, port_object.id)
             #if port_object is not None and port_object.id in self.switches_dict:
@@ -987,6 +990,12 @@ class OSIRISApp(app_manager.RyuApp):
     def check_port_in_node(self, node, port_name):
         for port in node.ports:
             if port.name == (node.name + ":" + port_name):
+                return port
+        return None
+
+    def check_port_in_node_by_name(self, node, port_name):
+        for port in node.ports:
+            if port.name == port_name:
                 return port
         return None
 
