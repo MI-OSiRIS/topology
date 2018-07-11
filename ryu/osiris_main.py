@@ -134,7 +134,7 @@ class OSIRISApp(app_manager.RyuApp):
         ## UnisRT debug lines
         #trace.setLevel(lace.logging.DEBUG) 
         print("UNIS SERVER: ", self.CONF.osiris.unis_server)
-        self.rt = Runtime(unis_server, proxy={ 'subscribe':False,'defer_update':True })
+        self.rt = Runtime([unis_server], proxy={ 'subscribe':False,'defer_update':True })
         print(self.rt.settings['proxy'])
        
         self.create_domain()
@@ -489,7 +489,7 @@ class OSIRISApp(app_manager.RyuApp):
             Also updates the link in the host that connects the topology to ChicPOP
         '''
         print("UNIS HOST: ", self.unis_host)
-        host_rt = Runtime(self.unis_host)      # we are going to update the 'main' topology based on the what is in the configuration file
+        host_rt = Runtime([self.unis_host])      # we are going to update the 'main' topology based on the what is in the configuration file
         topology = host_rt.topologies[0]                   # the first topology instance is the most recent and AFAIK the one we want
         topology_dict = topology.to_JSON()                 # this is how we get around the Runtime essentially sandboxing us, treat JSON as a dict.
         href_list = []                                     # create something to store the hrefs we are about to gather
@@ -504,7 +504,7 @@ class OSIRISApp(app_manager.RyuApp):
 
                 unis_href = href.split('8888', 1)[0] + '8888' # regex here?, TODO? 
                 print("TESTING OUT ", unis_href)
-                current_rt = Runtime(unis_href)
+                current_rt = Runtime([unis_href])
                 try:
                         most_recent_domain = list(current_rt.domains.where({"name":self.domain_obj.name}))[0]
                         print("Comparing ",self.domain_obj.name, most_recent_domain.name)
@@ -525,10 +525,11 @@ class OSIRISApp(app_manager.RyuApp):
                                     link_map = list(map(lambda link: link.name == link_name, topology.links))
                                     for key, l in enumerate(topology.links):
                                             if link_map[key] == True:
+                                                    
+                                                    print(link_map[key])
                                                     link = l
                                                     link.endpoints[0] = most_recent_domain
                                                     print('Verified the link to this domain.\n')
-                                                    print(link_map[key])
                                                     return
 
                                     if link == '' or topology.links == []: # no link was found, add it to the topology
