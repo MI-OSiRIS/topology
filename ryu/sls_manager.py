@@ -56,11 +56,11 @@ class SLS_Manager:
         '''
             Request module get abstraction
         '''
-        print("trying to get endpoint: ", endpoint, " from ", self.default_registry + endpoint) 
+        
         try:
             
             response = self.request(method = "GET", 
-                                    endpoint = self.default_registry + endpoint) 
+                                    endpoint = endpoint) 
             
             return response
         
@@ -74,14 +74,14 @@ class SLS_Manager:
             Query SLS for a user defined filter
         '''
         
-        response = self.get("?" + endpoint)
+        response = self.get(self.default_registry + "?" + endpoint)
         return response.json()
 
 
     
     #############################################################################################
     #
-    #  UNIS Integration
+    #  UNIS Helpers
     #
 
     def check_node_by_name(self, node_name):
@@ -96,10 +96,32 @@ class SLS_Manager:
 
     def get_host_details(self, urn):
         
-        res = self.get(self.base_uri + "/" + urn)
-
+        res = self.get(self.default_base_url + "/" + urn)
+        
         return res.json()
-    
+
+    def check_service_exists(self, service_data, node):
+        '''
+            Compares service API response data to a node in UNIS to see if an entry for that service on that node exists.
+
+            service_data is a single service response from the API, not a composite from a query
+        '''
+
+        service_name = service_data['service-type'][0]     
+        exists = self.rt.services.where(lambda s: (s.name == service_name and s.runningOn.href == node.selfRef)) 
+        
+        # check if generator is empty, return service if found, None if not found.
+        try:
+            service = exists.next()
+            return service
+        except:
+            return None
+            
+    #############################################################################################
+    #
+    #  UNIS Integration
+    #
+
     def validate_node(self, node_name=None, node_addr=None):
         '''
             Checks to see if a node is in UNIS or not. If there is no entry for a given node, create one.
@@ -134,10 +156,28 @@ class SLS_Manager:
         '''
             Checks for service in UNIS. If it does not exist create it.
         '''
-        lookup_urn = entry['service-host']
-        print(lookup_urn)
-        # TODO        
-        return
+        lookup_urn = entry['service-host'][0]
+        
+        print(self.default_base_url + '/' + lookup_urn)
+        node_response = self.get(self.default_base_url + '/' + lookup_urn).json() 
+        host_name = node_response['host-name'][1]
+        host_addr = node_response['host-name'][0]
+        
+        node = self.validate_node(node_name=host_name, node_addr=host_addr)
+
+        if node is not None:
+            service = self.check_service_exists(entry, node)
+        else:
+            print("Could not validate node for service " + self.default_base_url + "/" +  entry['uri'][0])
+            return False
+
+        
+        if service is not None:
+            print("Found a service entry for " + service_data['service-type'][0] + " on node " + node.name)
+        else:
+            print("Create service entry section")
+        
+        return service
 
     def integrate(self, data):
         '''
@@ -174,7 +214,7 @@ class SLS_Manager:
             
             # if a service is found that does not belong to a known host, add the host as a node into UNIS.
             if not known_host:
-                host = self.get(self.default_base_url + '/' + entry['service-host'][0].json())
+                host = self.get(self.default_base_url + '/' + entry['service-host'][0]).json()
                 node = self.validate_node(node_name = host[0]['host-name'][1], node_addr = host[0]['host-name'][0])
         
             # handle service.
