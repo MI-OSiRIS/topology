@@ -24,6 +24,7 @@ setuptools.setup(name='osiris-sdn-app',
                          ],
                  install_requires=[
                      'unisrt',
+                     'easysnmp',
                      'ryu',
                      'configparser'
                  ],
