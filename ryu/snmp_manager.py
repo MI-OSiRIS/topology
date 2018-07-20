@@ -13,7 +13,7 @@ class SNMP_Manager():
         self.version = version
         self.session = Session(hostname=self.host, community=self.community, version=self.version)
         
-        # make runtime element from config, hardcode placeholder for now
+        # TODO: make runtime element from config, hardcode placeholder for now
         if rt is None:
             self.rt = Runtime('http://periscope:9000')
         else:
@@ -31,14 +31,36 @@ class SNMP_Manager():
             result.append(ip_mac_dict)
         
         return result
+    '''
+        Takes a dict { ip: <val>, mac: <val>}.
+
+        Generates a new node resource to be added to the topology. Handle link generation.
+        Links are based off the mac address
+    '''
+    def add_discovered_node(self, ip_mac_dict):
+        
+        ip = ip_mac_dict['ip']
+        mac = ip_mac_dict['ip']
+
+        new_node = Node({
+                'name': ip,
+                'description': ('Discovered by ' + self.host + ' via SNMP'),
+                'properties': {
+                        'mgmtaddr': ip
+                    }
+            })
+
+        print(new_node.to_JSON())
+        
+        return
 
     '''
-        One of the 'main' function defs.
-
+       
         apply_snmp_nodes will search through a list of dicts { ip: <val>, mac: <val>} to see if a corresponding node
         exists in UNIS. if the node does not exist it will register the node in UNIS.
 
         Once all dicts in the supplied list have been processed, query the SNMP query the ip and repeat the function
+    
     '''
     def apply_snmp_nodes(self, ip_mac_list):
         
@@ -49,8 +71,10 @@ class SNMP_Manager():
             n = self.check_node_exists(ip = i['ip'], mac = i['mac'])
             
             if n is None:
-                print("Node with IP address ", i['ip'], " not found. Creating new node resource.")
-
+                print("Node with IP address ", i['ip'], " not found. CREATING NEW NODE resource.")
+                self.add_discovered_node(i)
+            else:
+                print("FOUND NODE with IP address ", n.properties.mgmtaddr) 
 
         return
     
@@ -85,7 +109,7 @@ class SNMP_Manager():
             raise ValueError('Function check_node_exists must be given an ip=<ip address> or mac=<mac address> parameter.')
         
         for n in self.rt.nodes:
-            if n.properties.mgmtaddr == ip or n.mgmtaddress == ip:
+            if n.properties.mgmtaddr == ip:
                 return n
         
         return None
