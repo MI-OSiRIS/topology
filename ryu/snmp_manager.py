@@ -71,6 +71,7 @@ class SNMP_Manager():
             self.rt.domains[0].nodes.append(node)
             self.rt.domains[0].ports.append(port)
             self.rt.domains[0].commit()
+            self.rt.flush()
         except:
             raise AttributeError("Could not commit Object to Domain")
         return node
@@ -151,11 +152,13 @@ class SNMP_Manager():
             try:
                 
                 print("Trying to query ", ip_mac_dict['ip'])
-                snmp_q = SNMP_Manager(host=ip_mac_dict['ip'])
+                snmp_q = SNMP_Manager(host=ip_mac_dict['ip'], rt=self.rt)
                 snmp_q.discover()
-                
+
+                print("Successful Query of ", ip_mac_dict['ip']) 
             except:
                 print("Error querying SNMP for , ", ip_mac_dict["ip"], " - continuing.")
+                continue
     #
     #   Helper Functions for processing SNMP Results
     #
