@@ -12,14 +12,18 @@ class SNMP_Manager():
         self.community = community
         self.version = version
         self.session = Session(hostname=self.host, community=self.community, version=self.version)
-        
+        self.neighbors = []
+
         # TODO: make runtime element from config, hardcode placeholder for now
         if rt is None:
             self.rt = Runtime('http://172.18.0.25:9000')
         else:
             self.rt = rt
 
-    def get_ip_routes(self):
+    def get_ip_routes(self, host=None):
+
+        if host is not None:
+            self.session = Session(hostname=host, community=self.community, version=self.version)
 
         ret = self.session.walk(ip_table_oid)
         result = []
@@ -29,6 +33,8 @@ class SNMP_Manager():
             ip  = self.parse_ip_addr(item.oid_index)
             ip_mac_dict = { 'ip': ip, 'mac': mac}
             result.append(ip_mac_dict)
+
+            self.neighbors.append(ip_mac_dict)
         
         return result
     '''
@@ -139,7 +145,17 @@ class SNMP_Manager():
     def discover(self):
         snmp_ip_mac_list = self.get_ip_routes()
         self.apply_snmp_nodes(snmp_ip_mac_list)
-
+    
+    def discover_neighbors(self):
+        for ip_mac_dict in self.neighbors:
+            try:
+                
+                print("Trying to query ", ip_mac_dict['ip'])
+                snmp_q = SNMP_Manager(host=ip_mac_dict['ip'])
+                snmp_q.discover()
+                
+            except:
+                print("Error querying SNMP for , ", ip_mac_dict["ip"], " - continuing.")
     #
     #   Helper Functions for processing SNMP Results
     #
@@ -172,3 +188,4 @@ class SNMP_Manager():
 if __name__ == "__main__":
     snmp = SNMP_Manager('172.18.0.30')
     snmp.discover()
+    snmp.discover_neighbors()
