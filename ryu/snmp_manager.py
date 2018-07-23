@@ -57,13 +57,16 @@ class SNMP_Manager():
                             'address': mac
                         }
                 })
-        node.ports.append(port) 
-        self.rt.insert(node, commit=True)
-        self.rt.insert(port, commit=True) 
-        self.rt.domains[0].nodes.append(node)
-        self.rt.domains[0].ports.append(port)
-        self.rt.domains[0].commit()
-         
+
+        try:
+            node.ports.append(port) 
+            self.rt.insert(node, commit=True)
+            self.rt.insert(port, commit=True) 
+            self.rt.domains[0].nodes.append(node)
+            self.rt.domains[0].ports.append(port)
+            self.rt.domains[0].commit()
+        except:
+            raise AttributeError("Could not commit Object to Domain")
         return node
     
     '''
@@ -78,11 +81,11 @@ class SNMP_Manager():
         
         print("Testing for links between ", host_node.name, " and ", test_node.name)
 
-        for host_port in host_node.ports:
-            
-            if hasattr(host_port, 'link'):
-                print(host_port.link)
-                if host_port.link.endpoints[0].node == test_node or host_port.link.endpoints[1].node == test_node:
+        for key in range(len(host_node.ports)):
+            #if hasattr(host_node.ports[key], 'link'):
+            print(dir(host_node.ports[key]))
+            print(host_node.ports[key].link.endpoints[0].node, host_node.ports[key].link.endpoints[1].node)
+            if host_node.ports[key].link.endpoints[0].node == test_node or host_node.ports[key].link.endpoints[1].node == test_node:
                     print("FOUND LINK AT OTHER END")
                     return host_port.link
 
@@ -95,7 +98,7 @@ class SNMP_Manager():
             })
 
         self.rt.insert(link, commit=True)
-        self.rt.domains[0].append(link)
+        self.rt.domains[0].links.append(link)
         self.rt.domains[0].commit()
         print("New link created.")
 
