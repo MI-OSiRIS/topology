@@ -81,18 +81,20 @@ class SNMP_Manager():
         
         print("Testing for links between ", host_node.name, " and ", test_node.name)
 
-        for key in range(len(host_node.ports)):
-            #if hasattr(host_node.ports[key], 'link'):
-            print(dir(host_node.ports[key]))
-            print(host_node.ports[key].link.endpoints[0].node, host_node.ports[key].link.endpoints[1].node)
-            if host_node.ports[key].link.endpoints[0].node == test_node or host_node.ports[key].link.endpoints[1].node == test_node:
-                    print("FOUND LINK AT OTHER END")
-                    return host_port.link
+       
+            
+        for host_port in host_node.ports:
+            for test_port in test_node.ports:
+                test_link_name = host_port.id + ':' + test_port.id
+                for link in self.rt.links:
+                    if link.name == test_link_name:
+                        return link
 
         print("Could not find link connecting ", host_node.name," and ", test_node.name, " - CREATING LINK.")
 
+        # need to determine specific ports for link generation, TODO
         link = Link({
-                'name': host_node.id + ':' + test_node.id,
+                'name': host_node.ports[0].id + ':' + test_node.ports[0].id,
                 'endpoints': [test_node.ports[0], host_node.ports[0]],
                 'directed': False
             })
