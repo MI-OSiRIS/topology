@@ -110,6 +110,7 @@ class SNMP_Manager():
         self.rt.insert(link, commit=True)
         self.rt.domains[0].links.append(link)
         self.rt.domains[0].commit()
+        self.rt.flush()
         print("New link created.")
 
         return link
