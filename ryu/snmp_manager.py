@@ -86,8 +86,7 @@ class SNMP_Manager():
         
         host_node = self.check_node_exists(ip=self.host)
         
-        print("Testing for links between ", host_node.name, " and ", test_node.name)
-        print(test_node.to_JSON())
+        print("Testing for links between ", host_node.name, " and ", test_node.name) 
        
             
         for host_port in host_node.ports:
@@ -144,6 +143,7 @@ class SNMP_Manager():
         Main function for learning about the network.
     '''
     def discover(self):
+        print("BEGIN discovery of base host ", self.host)
         snmp_ip_mac_list = self.get_ip_routes()
         self.apply_snmp_nodes(snmp_ip_mac_list)
     
@@ -190,5 +190,9 @@ class SNMP_Manager():
 
 if __name__ == "__main__":
     snmp = SNMP_Manager('172.18.0.30')
+    snmp.discover()
+    snmp.discover_neighbors()
+
+    snmp = SNMP_Manager('172.18.0.40')
     snmp.discover()
     snmp.discover_neighbors()
