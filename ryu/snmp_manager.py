@@ -66,8 +66,8 @@ class SNMP_Manager():
 
         try:
             node.ports.append(port) 
-            self.rt.insert(node, commit=True)
-            self.rt.insert(port, commit=True) 
+            node = self.rt.insert(node, commit=True)
+            port = self.rt.insert(port, commit=True) 
             self.rt.domains[0].nodes.append(node)
             self.rt.domains[0].ports.append(port)
             self.rt.domains[0].commit()
