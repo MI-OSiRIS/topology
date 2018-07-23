@@ -80,7 +80,7 @@ class SNMP_Manager():
         host_node = self.check_node_exists(ip=self.host)
         
         print("Testing for links between ", host_node.name, " and ", test_node.name)
-
+        print(test_node.to_JSON())
        
             
         for host_port in host_node.ports:
@@ -88,6 +88,7 @@ class SNMP_Manager():
                 test_link_name = host_port.id + ':' + test_port.id
                 for link in self.rt.links:
                     if link.name == test_link_name:
+                        print("FOUND LINK connecting ", host_node.name, " and ", test_node.name)
                         return link
 
         print("Could not find link connecting ", host_node.name," and ", test_node.name, " - CREATING LINK.")
