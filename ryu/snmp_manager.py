@@ -15,7 +15,7 @@ class SNMP_Manager():
         
         # TODO: make runtime element from config, hardcode placeholder for now
         if rt is None:
-            self.rt = Runtime('http://periscope:9000')
+            self.rt = Runtime('http://172.18.0.25:9000')
         else:
             self.rt = rt
 
@@ -42,17 +42,61 @@ class SNMP_Manager():
         ip = ip_mac_dict['ip']
         mac = ip_mac_dict['ip']
 
-        new_node = Node({
+        node = Node({
                 'name': ip,
                 'description': ('Discovered by ' + self.host + ' via SNMP'),
                 'properties': {
                         'mgmtaddr': ip
                     }
             })
-
-        print(new_node.to_JSON())
         
-        return
+        port = Port({
+                    'name': ip + ':' + mac,
+                    'address' : {
+                            'type':'mac',
+                            'address': mac
+                        }
+                })
+        node.ports.append(port) 
+        self.rt.insert(node, commit=True)
+        self.rt.insert(port, commit=True) 
+       
+         
+        return node
+    
+    '''
+        The SNMP query will give the local routing table for a given resource.
+
+        If a node is discovered, ensure there is a valid link for it given the namescheme. 
+        If there is no link describing this connection, make one.
+    '''
+    def test_link(self, test_node):
+        
+        host_node = self.check_node_exists(ip=self.host)
+        
+        print("Testing for links between ", host_node.name, " and ", test_node.name)
+
+        for host_port in host_node.ports:
+            
+            if hasattr(host_port, 'link'):
+                print(host_port.link)
+                if host_port.link.endpoints[0].node == test_node or host_port.link.endpoints[1].node == test_node:
+                    print("FOUND LINK AT OTHER END")
+                    return host_port.link
+
+        print("Could not find link connecting ", host_node.name," and ", test_node.name, " - CREATING LINK.")
+
+        link = Link({
+                'name': host_node.id + ':' + test_node.id,
+                'endpoints': [test_node.ports[0], host_node.ports[0]],
+                'directed': False
+            })
+
+        self.rt.insert(link, commit=True)
+
+        print("New link created.")
+
+        return link
 
     '''
        
@@ -65,16 +109,18 @@ class SNMP_Manager():
     def apply_snmp_nodes(self, ip_mac_list):
         
         for i in ip_mac_list:
-            
-            print(i)
-            print('IP: ', i['ip'], " | Mac: ", i['mac'])
+             
+            print('Checking - IP: ', i['ip'], " | Mac: ", i['mac'])
             n = self.check_node_exists(ip = i['ip'], mac = i['mac'])
             
             if n is None:
                 print("Node with IP address ", i['ip'], " not found. CREATING NEW NODE resource.")
-                self.add_discovered_node(i)
+                n = self.add_discovered_node(i)
             else:
                 print("FOUND NODE with IP address ", n.properties.mgmtaddr) 
+            
+            # see if there is a valid link in UNIS for this node.
+            self.test_link(n)
 
         return
     
