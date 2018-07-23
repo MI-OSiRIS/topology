@@ -92,8 +92,9 @@ class SNMP_Manager():
         for host_port in host_node.ports:
             for test_port in test_node.ports:
                 test_link_name = host_port.id + ':' + test_port.id
+                test_link_name2 = test_port.id + ':' + host_port.id
                 for link in self.rt.links:
-                    if link.name == test_link_name:
+                    if link.name == test_link_name or link.name == test_link_name2:
                         print("FOUND LINK connecting ", host_node.name, " and ", test_node.name)
                         return link
 
