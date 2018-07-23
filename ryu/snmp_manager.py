@@ -60,7 +60,9 @@ class SNMP_Manager():
         node.ports.append(port) 
         self.rt.insert(node, commit=True)
         self.rt.insert(port, commit=True) 
-       
+        self.rt.domains[0].nodes.append(node)
+        self.rt.domains[0].ports.append(port)
+        self.rt.domains[0].commit()
          
         return node
     
@@ -93,7 +95,8 @@ class SNMP_Manager():
             })
 
         self.rt.insert(link, commit=True)
-
+        self.rt.domains[0].append(link)
+        self.rt.domains[0].commit()
         print("New link created.")
 
         return link
