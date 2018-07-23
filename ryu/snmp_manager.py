@@ -5,14 +5,30 @@ from unis.models import *
 # Useful OIDS
 ip_table_oid = 'ipNetToPhysicalPhysAddress'
 arp_ip_mac_oid = '.1.3.6.1.2.1.3.1.1.2' 
+running_procs_oid = 'hrSWRunName'
 
 class SNMP_Manager():
+
     def __init__(self, host, community="aspiringvision", version=2, rt=None):
         self.host = host
         self.community = community
         self.version = version
         self.session = Session(hostname=self.host, community=self.community, version=self.version)
         self.neighbors = []
+        
+        self.osiris_service_manifest = [
+                    { name: 'snmpd',       desc: 'SNMP daemon.'},
+                    { name: 'ryu-manager', desc: 'RYU SDN Controller.'},
+                    { name: 'lldpd',       desc: 'LLDP daemon.'},
+                    { name: 'periscoped',  desc: 'UNIS network resource database.'},
+                    { name: 'node',        desc: 'NodeJS web application.'},
+                    { name: 'blippd',      desc: 'BLIPP performance monitoring tool.'}
+                    { name: 'ntpd',        desc: 'Network Time Protocol Daemon'},
+                    { name: 'schedular',   desc: 'PSchedular Service'},
+                    { name: 'archiver',    desc: 'PerfSONAR Esmond Archive utility'},
+                    { name: 'owampd',      desc: 'OWAMP web server'}
+                ]
+
 
         # TODO: make runtime element from config, hardcode placeholder for now
         if rt is None:
@@ -190,6 +206,9 @@ class SNMP_Manager():
         
         return None
 
+'''
+    Local Docker test case.
+'''
 if __name__ == "__main__":
     snmp = SNMP_Manager('172.18.0.30')
     snmp.discover()
