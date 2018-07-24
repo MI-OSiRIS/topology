@@ -17,17 +17,16 @@ class SNMP_Manager():
         self.neighbors = []
         
         self.osiris_service_manifest = [
-                    { name: 'snmpd',       desc: 'SNMP daemon.'},
-                    { name: 'ryu-manager', desc: 'RYU SDN Controller.'},
-                    { name: 'lldpd',       desc: 'LLDP daemon.'},
-                    { name: 'periscoped',  desc: 'UNIS network resource database.'},
-                    { name: 'node',        desc: 'NodeJS web application.'},
-                    { name: 'blippd',      desc: 'BLIPP performance monitoring tool.'}
-                    { name: 'ntpd',        desc: 'Network Time Protocol Daemon'},
-                    { name: 'schedular',   desc: 'PSchedular Service'},
-                    { name: 'archiver',    desc: 'PerfSONAR Esmond Archive utility'},
-                    { name: 'owampd',      desc: 'OWAMP web server'}
-                ]
+            { 'name': 'snmpd',       'desc': 'SNMP daemon.'},
+            { 'name': 'ryu-manager', 'desc': 'RYU SDN Controller.'},
+            { 'name': 'lldpd',       'desc': 'LLDP daemon.'},
+            { 'name': 'periscoped',  'desc': 'UNIS network resource database.'},
+            { 'name': 'node',        'desc': 'NodeJS web application.'},
+            { 'name': 'blippd',      'desc': 'BLIPP performance monitoring tool.'},
+            { 'name': 'ntpd',        'desc': 'Network Time Protocol Daemon'},
+            { 'name': 'schedular',   'desc': 'PSchedular Service'},
+            { 'name': 'archiver',    'desc': 'PerfSONAR Esmond Archive utility'},
+            { 'name': 'owampd',      'desc': 'OWAMP web server'}]
 
 
         # TODO: make runtime element from config, hardcode placeholder for now
