@@ -198,9 +198,6 @@ class SNMP_Manager():
             for item in services_list:
                  
                 matches = list(filter(lambda s: s.name == item['unis_name'], unis_services))
-                print("MATCHES for " + item['unis_name'] + ' on ' + node.name + ' - ')
-                
-                print(len(matches))
                 
                 if len(matches) > 0: # if there are matches, touch
                     print("Found existing service for " + item['unis_name'] + " at host " + node.name + ". Updating timestamp.")
