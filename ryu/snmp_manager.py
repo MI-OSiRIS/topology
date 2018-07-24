@@ -17,16 +17,16 @@ class SNMP_Manager():
         self.neighbors = []
         
         self.osiris_service_manifest = [
-            { 'name': 'snmpd',       'desc': 'SNMP daemon.'},
-            { 'name': 'ryu-manager', 'desc': 'RYU SDN Controller.'},
-            { 'name': 'lldpd',       'desc': 'LLDP daemon.'},
-            { 'name': 'periscoped',  'desc': 'UNIS network resource database.'},
-            { 'name': 'node',        'desc': 'NodeJS web application.'},
-            { 'name': 'blippd',      'desc': 'BLIPP performance monitoring tool.'},
-            { 'name': 'ntpd',        'desc': 'Network Time Protocol Daemon'},
-            { 'name': 'schedular',   'desc': 'PSchedular Service'},
-            { 'name': 'archiver',    'desc': 'PerfSONAR Esmond Archive utility'},
-            { 'name': 'owampd',      'desc': 'OWAMP web server'}]
+                { 'name': 'snmpd',       'desc': 'SNMP daemon.',                       'unis_name': 'snmp'},
+                { 'name': 'ryu-manager', 'desc': 'RYU SDN Controller.',                'unis_name': 'ryu'},
+                { 'name': 'lldpd',       'desc': 'LLDP daemon.',                       'unis_name': 'lldp'},
+                { 'name': 'periscoped',  'desc': 'UNIS network resource database.',    'unis_name': 'periscope'},
+                { 'name': 'node',        'desc': 'NodeJS web application.',            'unis_name': 'nodejs'},
+                { 'name': 'blippd',      'desc': 'BLIPP performance monitoring tool.', 'unis_name': 'blipp'},
+                { 'name': 'ntpd',        'desc': 'Network Time Protocol Daemon',       'unis_name': 'ntp'},
+                { 'name': 'schedular',   'desc': 'PSchedular Service',                 'unis_name': 'pschedular'},
+                { 'name': 'archiver',    'desc': 'PerfSONAR Esmond Archive utility',   'unis_name': 'esmond'},
+                { 'name': 'owampd',      'desc': 'OWAMP web server',                   'unis_name': 'owamp'}]
 
 
         # TODO: make runtime element from config, hardcode placeholder for now
@@ -35,6 +35,16 @@ class SNMP_Manager():
         else:
             self.rt = rt
 
+    #
+    #    SNMP Query Helpers
+    #
+    ################
+    
+    '''
+        SNMP Query a Host for its IP Routing Table. This OID corresponds to link layer `arp -a` command.
+    
+        Returns a list of IP/Mac address values styled {'ip': <ip address value>, 'dict':<mac address value>}
+    '''
     def get_ip_routes(self, host=None):
 
         if host is not None:
@@ -52,6 +62,31 @@ class SNMP_Manager():
             self.neighbors.append(ip_mac_dict)
         
         return result
+
+    def get_services_list(self, host=None):
+
+        session = Session(hostname=host, community=self.community, version=self.version)        
+        
+        try:
+            query = session.walk(running_procs_oid)
+        except Exception as e: 
+            print(e)
+            print('SNMP Service Query Failed')
+            return
+        result = []
+
+        for item in query:
+            s = self.service_in_manifest(item.value) 
+            if len(s) == 1 :
+                result.append(s[0])
+
+        return result
+
+    #
+    #    Use SNMP information to update resources.
+    #
+    ##############
+
     '''
         Takes a dict { ip: <val>, mac: <val>}.
 
@@ -131,6 +166,26 @@ class SNMP_Manager():
         return link
 
     '''
+        Query the currently running services for a given host.
+
+        Test to see if the service exists. If it does, poke the timestamp.
+        If it does not, create a new service entry and push it to UNIS.
+
+        If there is a service entry no longer running on the Host set the service to 
+        not running.
+    '''
+    def update_services(self, ip):
+        services_list = self.get_services_list(host=ip)
+        print("Service List for ", ip, " - ", services_list)
+        
+        node = self.check_node_exists(ip=ip)
+        if node is not None:
+            services = self.rt.services.where({'runningOn': node.runningOn})
+            
+
+        return
+
+    '''
        
         apply_snmp_nodes will search through a list of dicts { ip: <val>, mac: <val>} to see if a corresponding node
         exists in UNIS. if the node does not exist it will register the node in UNIS.
@@ -154,12 +209,16 @@ class SNMP_Manager():
             # see if there is a valid link in UNIS for this node.
             self.test_link(n)
 
+        # find and update service entries in UNIS for this host.
+        self.update_services(self.host) 
+   
         return
     
     '''
         Main function for learning about the network.
     '''
     def discover(self):
+        
         print("BEGIN discovery of base host ", self.host)
         snmp_ip_mac_list = self.get_ip_routes()
         self.apply_snmp_nodes(snmp_ip_mac_list)
@@ -189,6 +248,10 @@ class SNMP_Manager():
         ip_addr = '.'.join(ip_oid.split('.')[-4:])
         print(ip_addr)
         return ip_addr
+
+    def service_in_manifest(self, service_string):
+        result = list(filter(lambda s: s['name'] == service_string, self.osiris_service_manifest))
+        return result
 
     #
     #   UNIS Integration
