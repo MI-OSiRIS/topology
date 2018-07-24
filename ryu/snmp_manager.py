@@ -17,16 +17,16 @@ class SNMP_Manager():
         self.neighbors = []
         
         self.osiris_service_manifest = [
-                { 'name': 'snmpd',       'desc': 'SNMP daemon.',                       'unis_name': 'snmp'},
-                { 'name': 'ryu-manager', 'desc': 'RYU SDN Controller.',                'unis_name': 'ryu'},
-                { 'name': 'lldpd',       'desc': 'LLDP daemon.',                       'unis_name': 'lldp'},
-                { 'name': 'periscoped',  'desc': 'UNIS network resource database.',    'unis_name': 'periscope'},
-                { 'name': 'node',        'desc': 'NodeJS web application.',            'unis_name': 'nodejs'},
-                { 'name': 'blippd',      'desc': 'BLIPP performance monitoring tool.', 'unis_name': 'blipp'},
-                { 'name': 'ntpd',        'desc': 'Network Time Protocol Daemon',       'unis_name': 'ntp'},
-                { 'name': 'schedular',   'desc': 'PSchedular Service',                 'unis_name': 'pschedular'},
-                { 'name': 'archiver',    'desc': 'PerfSONAR Esmond Archive utility',   'unis_name': 'esmond'},
-                { 'name': 'owampd',      'desc': 'OWAMP web server',                   'unis_name': 'owamp'}]
+                { 'name': 'snmpd',       'desc': 'SNMP daemon.',                       'unis_name': 'snmp',       'unis_service_type': 'host:snmp'},
+                { 'name': 'ryu-manager', 'desc': 'RYU SDN Controller.',                'unis_name': 'ryu',        'unis_service_type': 'nmal:tools:ryu'},
+                { 'name': 'lldpd',       'desc': 'LLDP daemon.',                       'unis_name': 'lldp',       'unis_service_type': 'host:lldp'},
+                { 'name': 'periscoped',  'desc': 'UNIS network resource database.',    'unis_name': 'periscope',  'unis_service_type': 'ps:tools:periscope'},
+                { 'name': 'node',        'desc': 'NodeJS web application.',            'unis_name': 'nodejs',     'unis_service_type': 'host:node'},
+                { 'name': 'blippd',      'desc': 'BLIPP performance monitoring tool.', 'unis_name': 'blipp',      'unis_service_type': 'ps:tools:blipp'},
+                { 'name': 'ntpd',        'desc': 'Network Time Protocol Daemon',       'unis_name': 'ntp',        'unis_service_type': 'host:ntp'},
+                { 'name': 'schedular',   'desc': 'PSchedular Service',                 'unis_name': 'pschedular', 'unis_service_type': 'ps:tools:pschedular'},
+                { 'name': 'archiver',    'desc': 'PerfSONAR Esmond Archive utility',   'unis_name': 'esmond',     'unis_service_type': 'ps:tools:esmond'},
+                { 'name': 'owampd',      'desc': 'OWAMP web server',                   'unis_name': 'owamp',      'unis_service_type': 'host:owamp'}]
 
 
         # TODO: make runtime element from config, hardcode placeholder for now
@@ -73,12 +73,16 @@ class SNMP_Manager():
             print(e)
             print('SNMP Service Query Failed')
             return
+
         result = []
+        s_name_track = []
 
         for item in query:
             s = self.service_in_manifest(item.value) 
-            if len(s) == 1 :
-                result.append(s[0])
+            if len(s) == 1:
+                if s[0]['name'] not in s_name_track:
+                    s_name_track.append(s[0]['name'])
+                    result.append(s[0])
 
         return result
 
@@ -179,9 +183,38 @@ class SNMP_Manager():
         print("Service List for ", ip, " - ", services_list)
         
         node = self.check_node_exists(ip=ip)
+        unis_services = []
+        
         if node is not None:
-            services = self.rt.services.where({'runningOn': node.runningOn})
+            services = self.rt.services.where({'runningOn':  node, 'status':'ON' })
             
+            try:
+                for s in services:
+                    unis_services.append(s) 
+            except:
+                print('Could not find any existing UNIS entries for services at host ' + node.name)
+ 
+            # check if service exists in UNIS, if not create one
+            for item in services_list:
+                 
+                matches = list(filter(lambda s: s.name == item['unis_name'], unis_services))
+                print("MATCHES for " + item['unis_name'] + ' on ' + node.name + ' - ')
+                
+                print(len(matches))
+                
+                if len(matches) > 0: # if there are matches, touch
+                    print("Found existing service for " + item['unis_name'] + " at host " + node.name + ". Updating timestamp.")
+                    map(lambda s: s.touch(), matches)
+                else:
+                    # create new services
+                    print('Creating new service for ' + item['unis_name'] + ' at host ' + node.name)
+                    service = Service({'name':item['unis_name'], 'runningOn': {'href': node.selfRef, 'rel': 'full'}, 'status':'ON', 'serviceType': item['unis_service_type']})
+                    self.rt.insert(service, commit=True)
+
+            self.rt.flush()
+
+        else:
+            print('Node not found for ' + ip + ', continuing.')
 
         return
 
