@@ -116,6 +116,10 @@ class SNMP_Manager():
                             'type':'mac',
                             'address': mac
                         }
+                    'properties':{
+                            'type':'virtual_link',
+                            
+                        }
                 })
 
         try:
@@ -158,7 +162,10 @@ class SNMP_Manager():
         link = Link({
                 'name': host_node.ports[0].id + ':' + test_node.ports[0].id,
                 'endpoints': [test_node.ports[0], host_node.ports[0]],
-                'directed': False
+                'directed': False,
+                'properties': {
+                        'type':'arp',
+                    }
             })
 
         self.rt.insert(link, commit=True)
